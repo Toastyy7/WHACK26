@@ -17,6 +17,10 @@ npm test
 npm run build
 ```
 
+To get the fixes on your local checkout, switch to `jamieBranch`, run `git pull --ff-only`, then `npm ci` and `npm run dev`. Open the localhost URL printed by Vite. The React source needs the dev server; opening the root HTML file directly will not run it. For the Chrome extension, reload the unpacked extension in `chrome://extensions` and refresh the checkout tab after pulling changes.
+
+Optional extension browser regression checks: install Python's `playwright` package in a virtual environment and run `python scripts/check-extension.py` with Chromium installed. Set `CHROMIUM_PATH` if Chromium is not at `/usr/bin/chromium`. These checks simulate Chrome storage and verify grouped prices, dismissal after Continue and a new warning when the total changes.
+
 The first install needs network access. Copy the source files into your team repo and leave `node_modules` and `dist` out of Git.
 
 ## Demo in 90 seconds

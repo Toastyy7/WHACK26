@@ -4,6 +4,7 @@
  */
 
 (function () {
+  let dismissedCheckout = null;
   const DEFAULT_SETTINGS = {
     isEnabled: true,
     monthlyBudget: 300,
@@ -262,8 +263,8 @@
     for (const selector of totalSelectors) {
       const el = document.querySelector(selector);
       if (el && el.innerText) {
-        const match = el.innerText.match(/[$£€]\s*([0-9]+(?:\.[0-9]{2})?)/);
-        if (match) return parseFloat(match[1]);
+        const match = el.innerText.match(/[$£€]\s*((?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d{1,2})?)(?![\d.,])/);
+        if (match) return Number(match[1].replaceAll(',', ''));
       }
     }
 
@@ -272,9 +273,9 @@
     for (const el of elements) {
       const text = el.innerText || "";
       if (/total/i.test(text) && /[$£€]/.test(text)) {
-        const match = text.match(/[$£€]\s*([0-9]+(?:\.[0-9]{2})?)/);
+        const match = text.match(/[$£€]\s*((?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d{1,2})?)(?![\d.,])/);
         if (match) {
-          const val = parseFloat(match[1]);
+          const val = Number(match[1].replaceAll(',', ''));
           if (val > 0 && val < 50000) return val;
         }
       }
@@ -418,6 +419,7 @@
         proceedBtn.classList.add("unlocked");
         proceedBtn.textContent = "I've considered it — Continue to Checkout";
         proceedBtn.addEventListener("click", () => {
+          dismissedCheckout = `${window.location.href}|${cartTotal}`;
           overlay.remove();
         });
       }
@@ -446,6 +448,7 @@
 
       if (detection.isCheckout && !isAlreadyInjected()) {
         const total = extractCartTotal();
+        if (dismissedCheckout === `${window.location.href}|${total}`) return;
         createOverlay(total, settings);
       }
     });
