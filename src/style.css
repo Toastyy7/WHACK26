@@ -2,10 +2,40 @@
   font:
     16px/1.5 system-ui,
     sans-serif;
-  color: #15263d;
-  background: #f1f5fa;
-  --blue: #17479a;
-  --line: #c9d5e5;
+  /* Capital One-inspired blue and red, with separate readable theme colours. */
+  --brand-blue: #004878;
+  --brand-red: #d22e1e;
+  --blue: #004878;
+  --page: #f3f6f8;
+  --surface: #ffffff;
+  --text: #172d40;
+  --muted: #4c6172;
+  --line: #ccd7df;
+  --input-border: #718899;
+  --soft: #eaf2f8;
+  --track: #e0e7ed;
+  --focus: #b92719;
+  --button: #004878;
+  --button-text: #ffffff;
+  color-scheme: light;
+  color: var(--text);
+  background: var(--page);
+}
+/* Override tokens once, rather than repeating dark styles for every component. */
+:root[data-theme='dark'] {
+  --blue: #9cd4fa;
+  --page: #0c1823;
+  --surface: #142838;
+  --text: #edf5fb;
+  --muted: #b8cbd9;
+  --line: #375165;
+  --input-border: #7c98ad;
+  --soft: #1c3549;
+  --track: #304959;
+  --focus: #ffb4a9;
+  --button: #9cd4fa;
+  --button-text: #092437;
+  color-scheme: dark;
 }
 * {
   box-sizing: border-box;
@@ -15,6 +45,7 @@
 }
 body {
   margin: 0;
+  background: var(--page);
 }
 main {
   max-width: 1230px;
@@ -27,10 +58,11 @@ header {
   justify-content: space-between;
   gap: 12px;
   padding: 20px 0;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 3px solid var(--brand-red);
 }
 .brand {
   font-weight: 800;
+  color: var(--blue);
 }
 .intro {
   padding: 30px 0 20px;
@@ -61,7 +93,8 @@ h2 {
   grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
   gap: 20px;
   padding: 24px;
-  background: #142d50;
+  background: var(--brand-blue);
+  border-top: 4px solid var(--brand-red);
   color: white;
   border-radius: 18px;
   margin-bottom: 22px;
@@ -80,7 +113,7 @@ h2 {
 }
 .card,
 .demo {
-  background: white;
+  background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 16px;
   padding: 20px;
@@ -123,9 +156,9 @@ textarea,
 select {
   display: block;
   width: 100%;
-  border: 1px solid #758ba8;
+  border: 1px solid var(--input-border);
   border-radius: 8px;
-  background: white;
+  background: var(--surface);
   color: inherit;
   padding: 8px;
   margin-top: 4px;
@@ -137,15 +170,15 @@ input[type='checkbox'] {
 }
 button {
   cursor: pointer;
-  background: var(--blue);
-  color: white;
-  border: 1px solid var(--blue);
+  background: var(--button);
+  color: var(--button-text);
+  border: 1px solid var(--button);
   border-radius: 8px;
   padding: 8px 13px;
   font-weight: 650;
 }
 button.secondary {
-  background: white;
+  background: var(--surface);
   color: var(--blue);
 }
 button:disabled {
@@ -153,7 +186,7 @@ button:disabled {
   cursor: default;
 }
 :focus-visible {
-  outline: 3px solid #ce5700;
+  outline: 3px solid var(--focus);
   outline-offset: 3px;
 }
 /* Shared colours keep the gauge and the what-if result consistent. */
@@ -176,10 +209,10 @@ button:disabled {
   width: 100%;
   height: 22px;
   margin-bottom: 10px;
-  border: 1px solid #758ba8;
+  border: 1px solid var(--input-border);
   border-radius: 11px;
   overflow: hidden;
-  background: #e5eaf0;
+  background: var(--track);
 }
 .gauge-fill {
   height: 100%;
@@ -191,18 +224,18 @@ button:disabled {
 }
 .gauge-legend {
   font-size: 0.85rem;
-  color: #425675;
+  color: var(--muted);
 }
 .badge {
   display: inline-block;
-  background: #e5efff;
+  background: var(--soft);
   padding: 4px 10px;
   border-radius: 8px;
   font-weight: 650;
 }
 .result,
 blockquote {
-  background: #edf3fc;
+  background: var(--soft);
   padding: 12px;
   margin: 12px 0;
   border-radius: 8px;
@@ -216,7 +249,7 @@ blockquote {
 }
 footer {
   padding: 24px 0;
-  color: #425675;
+  color: var(--muted);
 }
 
 /* Native modal keeps keyboard focus inside until dismissed. */
@@ -225,8 +258,111 @@ dialog {
   padding: 24px;
   border: 1px solid var(--line);
   border-radius: 16px;
-  color: inherit;
+  color: var(--text);
+  background: var(--surface);
 }
 dialog::backdrop {
   background: rgb(15 30 50 / 55%);
 }
+
+.header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.navigation-menu {
+  position: relative;
+}
+.navigation-options {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  z-index: 10;
+  min-width: 180px;
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgb(20 45 80 / 15%);
+}
+.navigation-options button {
+  text-align: left;
+}
+.navigation-options [aria-current='page'] {
+  background: var(--soft);
+}
+.back-button {
+  margin-bottom: 16px;
+}
+@media (max-width: 600px) {
+  header { flex-wrap: wrap; }
+}
+
+/* Keep status colours distinct and legible on dark surfaces too. */
+:root[data-theme='dark'] .zone-green {
+  --zone-fill: #56d68b;
+  --zone-background: #153f2c;
+  --zone-text: #a0f0bb;
+}
+:root[data-theme='dark'] .zone-amber {
+  --zone-fill: #f5bd50;
+  --zone-background: #493514;
+  --zone-text: #ffdb8a;
+}
+:root[data-theme='dark'] .zone-red {
+  --zone-fill: #ff8686;
+  --zone-background: #4b252a;
+  --zone-text: #ffbaba;
+}
+button:hover:not(:disabled) {
+  filter: brightness(0.94);
+}
+
+/* Statement results share the same surface tokens in light and dark mode. */
+.muted { color: var(--muted); }
+.file-name { overflow-wrap: anywhere; min-width: 0; }
+.notice {
+  background: var(--soft);
+  border-left: 4px solid var(--blue);
+  padding: 16px;
+  margin: 20px 0;
+  border-radius: 8px;
+}
+.statement-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  margin: 24px 0;
+}
+.statement-stats > div { padding: 16px; background: var(--soft); border-radius: 12px; }
+.statement-stats span, .statement-stats strong { display: block; }
+.statement-stats strong { font-size: 1.6rem; }
+.category-summary { list-style: none; padding: 0; margin: 24px 0; }
+.category-summary li { margin-bottom: 18px; }
+.category-heading { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; }
+.category-track { height: 10px; background: var(--track); border-radius: 5px; overflow: hidden; margin-top: 8px; }
+.category-track > div { height: 100%; background: var(--blue); }
+.transaction-review { border-top: 1px solid var(--line); padding-top: 18px; }
+.transaction-review > p { margin-top: 12px; }
+.table-scroll { overflow-x: auto; margin-top: 16px; }
+table { width: 100%; border-collapse: collapse; text-align: left; }
+caption { text-align: left; font-weight: 700; padding-bottom: 12px; }
+th, td { padding: 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { background: var(--soft); }
+td select { min-width: 210px; margin: 0; }
+.amount-cell { white-space: nowrap; }
+
+.home-spending { margin-top: 20px; }
+.home-spending .actions { margin-top: 20px; }
+/* A simple, dated transaction list for Home. */
+.home-spending-total { padding: 16px 0; }
+.home-spending-total > span, .home-spending-total > strong { display: block; }
+.home-spending-total > strong { font-size: 2rem; }
+.home-transactions { list-style: none; padding: 0; margin: 12px 0 20px; }
+.home-transactions li { display: flex; justify-content: space-between; align-items: start; gap: 16px; padding: 14px 0; border-bottom: 1px solid var(--line); }
+.home-transactions li > div { min-width: 0; }
+.home-transactions li > strong { white-space: nowrap; }
+.transaction-description { display: block; overflow-wrap: anywhere; }
+.transaction-date { display: block; font-size: 0.85rem; margin-top: 4px; }
