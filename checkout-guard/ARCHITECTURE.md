@@ -29,6 +29,8 @@ Only field presence is inspected; card-number/CVV values are not read. Only visi
 
 The content script loads settings once and subscribes to relevant local storage changes. Read failures do not activate a guessed budget. A guarded refresh scans after external DOM changes, including text-node changes. Changes inside the extension's own UI are ignored to avoid observation loops or repeated screen-reader announcements. A lightweight URL check covers SPA `pushState` and `replaceState` without modifying a site's History API. Navigating away from a checkout closes its dialog.
 
+Pages without a checkout route, checkout container or payment-field signal skip button visibility/layout reads because they cannot meet the detection threshold. Hidden tabs defer scans until visible unless a dialog is already open; settings changes can still update or disable an existing preview.
+
 An order is identified in memory by its current URL and detected pence total. Changing the total or URL creates a new preview and pause. Changing settings updates the existing preview; turning the guard off closes it. Continue, Close and Escape dismiss that order for the life of the page. A new total may warn again; unrelated page mutations cannot restart a dismissed warning.
 
 The timer uses an absolute deadline, so throttled background tabs do not artificially extend the reflection period. Timers and keyboard/focus listeners are removed when a dialog closes. The dialog traps Tab, supports Escape, and restores the previous focus. It is a reflection aid, not a payment blocker or order cancellation mechanism.

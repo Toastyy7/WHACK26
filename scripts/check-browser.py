@@ -203,10 +203,26 @@ try:
         expect(detection.get_by_role('dialog')).to_be_visible()
         detection.goto(base + '/checkout-guard/test-checkout.html')
         detection.evaluate("document.body.innerHTML = '<h1>Headphones</h1><input type=search><p id=order-total>£65.00</p><button>Add to cart</button>'")
+        detection.evaluate("""() => {
+          window.__buttonReads = 0;
+          const original = HTMLElement.prototype.getBoundingClientRect;
+          HTMLElement.prototype.getBoundingClientRect = function (...args) {
+            if (this.tagName === 'BUTTON') window.__buttonReads++;
+            return original.apply(this, args);
+          };
+        }""")
         inject(detection)
         detection.wait_for_timeout(300)
         expect(detection.locator('#checkout-guard-overlay')).to_have_count(0)
-        print('PASS detection: domain boundaries, Amazon checkout with navigation cart, product-page exclusion')
+        assert detection.evaluate('window.__buttonReads') == 0
+        detection.goto(base + '/checkout-guard/test-checkout.html')
+        detection.evaluate("Object.defineProperty(document, 'hidden', {value: true, configurable: true})")
+        inject(detection)
+        detection.wait_for_timeout(300)
+        expect(detection.locator('#checkout-guard-overlay')).to_have_count(0)
+        detection.evaluate("Object.defineProperty(document, 'hidden', {value: false, configurable: true});document.dispatchEvent(new Event('visibilitychange'))")
+        expect(detection.get_by_role('dialog')).to_be_visible()
+        print('PASS detection: domain boundaries, Amazon checkout, product-page fast path, hidden-tab deferral')
 
         popup = extension.new_page()
         popup.goto(base + '/checkout-guard/popup.html')

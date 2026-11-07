@@ -107,21 +107,6 @@
     const signals = [];
     const activeCategories = new Set();
 
-    const buttons = Array.from(
-      document.querySelectorAll("button, input[type='submit'], a.button, [role='button']")
-    ).filter(isElementVisible);
-
-    // Guardrail: Product page with "Add to Cart" or "Add to Bag"
-    const hasAddToCart = buttons.some((btn) => {
-      const text = (btn.innerText || btn.value || "").trim().toLowerCase();
-      return /^(add to (cart|bag|basket)|pre-order now)/i.test(text);
-    });
-
-    // Guardrail: Generic site-wide search box
-    const hasSearchInput = Array.from(
-      document.querySelectorAll('input[type="search"], input[name="q"], input[name="search"]')
-    ).some(isElementVisible);
-
     // Category 1: Explicit E-Commerce Checkout Form / Step Containers (+5 pts)
     const checkoutContainers = [
       'form.woocommerce-checkout',
@@ -180,6 +165,27 @@
       signals.push(`PAYMENT_FIELDS(${visiblePaymentFields.length})`);
       activeCategories.add("PAYMENT");
     }
+
+    // Without a route, checkout container or payment field, the remaining
+    // action/summary signals can score at most 7. Avoid layout reads on every button.
+    if (!hasCheckoutContainer && !isCheckoutPath && visiblePaymentFields.length === 0) {
+      return { isCheckout: false, score, signals };
+    }
+
+    const buttons = Array.from(
+      document.querySelectorAll("button, input[type='submit'], a.button, [role='button']")
+    ).filter(isElementVisible);
+
+    // Guardrail: Product page with "Add to Cart" or "Add to Bag"
+    const hasAddToCart = buttons.some((btn) => {
+      const text = (btn.innerText || btn.value || "").trim().toLowerCase();
+      return /^(add to (cart|bag|basket)|pre-order now)/i.test(text);
+    });
+
+    // Guardrail: Generic site-wide search box
+    const hasSearchInput = Array.from(
+      document.querySelectorAll('input[type="search"], input[name="q"], input[name="search"]')
+    ).some(isElementVisible);
 
     // Category 4: High-Intent Final Order Action Buttons (+5 pts)
     const finalCheckoutBtn = buttons.find((btn) => {
@@ -400,6 +406,7 @@
 
   function refresh() {
     if (!settings) return;
+    if (settings.isEnabled && document.hidden && !active) return;
     if (!settings.isEnabled || !detectCheckout().isCheckout) {
       active?.close();
       dismissedCheckout = null;
@@ -413,6 +420,7 @@
   }
 
   function scheduleRefresh() {
+    if (document.hidden && !active) return;
     if (refreshTimer !== null) return;
     refreshTimer = setTimeout(() => {
       refreshTimer = null;
@@ -434,6 +442,7 @@
   }
 
   const observer = new MutationObserver((records) => {
+    if (document.hidden && !active) return;
     if (active && !active.overlay.isConnected) {
       active.close();
       scheduleRefresh();
@@ -452,6 +461,9 @@
   });
   document.addEventListener('input', (event) => {
     if (!active?.overlay.contains(event.target)) scheduleRefresh();
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) scheduleRefresh();
   });
   window.addEventListener('popstate', scheduleRefresh);
   window.addEventListener('hashchange', scheduleRefresh);
