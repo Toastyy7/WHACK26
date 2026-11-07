@@ -25,6 +25,24 @@ test('purchase preview is pure and handles the target and half-limit boundaries'
   assert.equal(pence('12.005'), null);
 });
 
+test('gauge colours follow the selected target and retain over-limit percentages', () => {
+  const state = initial();
+  for (const [balance, zone, percentage] of [
+    [28000, 'safe', 28],
+    [30000, 'warning', 30],
+    [49999, 'warning', 49.999],
+    [50000, 'danger', 50],
+    [108000, 'danger', 108],
+  ]) {
+    const result = gauge(balance, state.limit, state.target);
+    assert.equal(result.zone, zone);
+    assert.equal(result.percentage, percentage);
+  }
+  assert.equal(gauge(28000, state.limit, 25).zone, 'warning');
+  assert.equal(gauge(28000, state.limit, 40).zone, 'safe');
+  assert.equal(state.balance, 28000);
+});
+
 test('weekly checks post once, preserve the buffer and update the minimum', () => {
   const state = { ...initial(), plan: 'active' };
   const first = runPayment(state);

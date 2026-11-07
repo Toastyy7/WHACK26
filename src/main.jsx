@@ -21,21 +21,31 @@ function Gauge({ account }) {
   const current = gauge(balance, limit, target);
   const amount = pence(purchase);
   const projected = gauge(balance + (amount ?? 0), limit, target);
+  const previewing = purchase !== '' && amount !== null;
+  const displayed = previewing ? projected : current;
+  const displayedBalance = previewing ? balance + amount : balance;
   return (
     <section className="card">
       <p className="eyebrow">01 / SAFE-ZONE GAUGE</p>
       <h2>Understand your balance</h2>
       <p>
-        <strong>{money(balance)}</strong> of {money(limit)} used ·{' '}
-        {percent(current.percentage)}
+        {previewing ? 'Projected balance: ' : 'Current balance: '}
+        <strong>{money(displayedBalance)}</strong> of {money(limit)} used ·{' '}
+        {percent(displayed.percentage)}
       </p>
-      <meter
-        min="0"
-        max="100"
-        value={Math.min(100, current.percentage)}
-        aria-label="Current credit limit used"
-      />
-      <p className="badge">{current.label}</p>
+      {previewing && <p>Current balance: {money(balance)}</p>}
+      <div
+        className={`gauge ${displayed.zone}`}
+        role="meter"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={Math.min(100, displayed.percentage)}
+        aria-valuetext={`${percent(displayed.percentage)} used. ${displayed.label}${displayedBalance > limit ? '. This would exceed your credit limit.' : ''}`}
+        aria-label={previewing ? 'Projected credit limit used' : 'Current credit limit used'}
+      >
+        <span style={{ width: `${Math.min(100, displayed.percentage)}%` }} />
+      </div>
+      <p className={`badge ${displayed.zone}`}>{displayed.label}</p>
       <label>
         What would a purchase cost (£)?
         <input
@@ -43,6 +53,7 @@ function Gauge({ account }) {
           value={purchase}
           onChange={(e) => setPurchase(e.target.value)}
           aria-describedby="projection"
+          aria-invalid={purchase !== '' && amount === null}
         />
       </label>
       <button

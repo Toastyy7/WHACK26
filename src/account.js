@@ -28,6 +28,7 @@ export function gauge(balance, limit, target) {
   const percentage = (balance * 100) / limit;
   return {
     percentage,
+    zone: percentage >= 50 ? 'danger' : percentage >= target ? 'warning' : 'safe',
     threshold: Math.ceil((limit * target) / 100),
     label:
       percentage >= 50

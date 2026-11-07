@@ -326,15 +326,20 @@
     const overlay = document.createElement("div");
     overlay.id = "checkout-guard-overlay";
 
-    const budget = Number(settings.monthlyBudget) || 300;
-    const spent = Number(settings.currentSpent) || 0;
+    const savedBudget = Number(settings.monthlyBudget);
+    const savedSpent = Number(settings.currentSpent);
+    const budget = Number.isFinite(savedBudget) && savedBudget >= 0.01
+      ? savedBudget : DEFAULT_SETTINGS.monthlyBudget;
+    const spent = Number.isFinite(savedSpent) && savedSpent >= 0
+      ? savedSpent : DEFAULT_SETTINGS.currentSpent;
     const purchaseAmount = cartTotal !== null ? cartTotal : 35.00; // sensible fallback
-    const projectedSpent = spent + purchaseAmount;
+    const projectedSpent = (Math.round(spent * 100) + Math.round(purchaseAmount * 100)) / 100;
     const remainingBudget = Math.max(0, budget - projectedSpent);
-    const percentUsed = Math.min(100, Math.round((projectedSpent / budget) * 100));
+    const percentUsed = (projectedSpent / budget) * 100;
+    const percentLabel = new Intl.NumberFormat('en-GB', { maximumFractionDigits: 2 }).format(percentUsed);
 
     let gaugeClass = "";
-    let statusText = "Within healthy budget";
+    let statusText = "Within your budget";
     if (percentUsed >= 80 && percentUsed <= 100) {
       gaugeClass = "warning";
       statusText = "Approaching spending limit";
@@ -368,10 +373,10 @@
           </div>
           
           <div class="cg-gauge-bar" title="${percentUsed}% of budget used">
-            <div class="cg-gauge-fill ${gaugeClass}" style="width: ${percentUsed}%;"></div>
+            <div class="cg-gauge-fill ${gaugeClass}" style="width: ${Math.min(100, percentUsed)}%;"></div>
           </div>
           <div style="margin-top: 6px; font-size: 12px; color: #64748b; text-align: right;">
-            ${statusText} (${percentUsed}%)
+            ${statusText} (${percentLabel}%)
           </div>
         </div>
 
