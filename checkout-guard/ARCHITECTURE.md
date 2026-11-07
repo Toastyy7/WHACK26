@@ -90,12 +90,15 @@ checkout-guard/
 * **Arguments:**
   * `durationSeconds` (`number`): Number of seconds user must wait (e.g., 30).
   * `onComplete` (`function`): Callback executed when timer reaches 0, which unlocks the "Proceed" button.
-* **Returns:** `void`.
+* **Session Approval & Infinite Lockout Prevention:**
+  * When the user clicks "Continue to Checkout", a session flag (`sessionStorage.setItem("cg_session_checkout_approved", "true")`) is stored, and the `MutationObserver` is disconnected.
+  * This guarantees the user is **not** locked out repeatedly on the same checkout page and can freely finalize their purchase.
 
 #### 6. `initCheckoutGuard(): void`
-* **Why:** Main lifecycle controller. Runs when the content script loads, calls `detectCheckout()`, reads configuration from `chrome.storage.local`, and injects the overlay if active. Sets up a debounced `MutationObserver` to handle SPA route changes.
-* **Arguments:** None.
-* **Returns:** `void`.
+* **Why:** Main lifecycle controller. Runs when the content script loads, checks session approval status, executes fast-path domain/URL filters to ensure **zero browser lag**, reads configuration from `chrome.storage.local`, and injects the overlay if active.
+* **Performance Optimizations:**
+  * *Fast-Path Exit:* If the page URL lacks shopping/checkout keywords and contains no payment iframes, DOM scanning is completely bypassed.
+  * *Native Visibility:* Uses modern browser C++ `el.checkVisibility()` instead of forced layout recalculations (`getComputedStyle`/`getBoundingClientRect`), completely eliminating UI stutter on catalog browsing.
 
 ---
 

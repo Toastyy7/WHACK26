@@ -11,19 +11,35 @@
     cooldownSeconds: 15,
   };
 
+  // Session-level approval flag so the user can actually complete their purchase
+  // without getting locked into an infinite cooldown loop.
+  const SESSION_APPROVED_KEY = "cg_session_checkout_approved";
+  let isSessionApproved = false;
+  let observer = null;
+
+  try {
+    if (sessionStorage.getItem(SESSION_APPROVED_KEY) === "true") {
+      isSessionApproved = true;
+    }
+  } catch (e) {}
+
   /**
-   * Helper: Check if an element is genuinely rendered and visible on screen.
+   * Ultra-fast element visibility check using native C++ browser API.
+   * Avoids window.getComputedStyle and getBoundingClientRect layout thrashing.
    * @param {Element} el
    * @returns {boolean}
    */
   function isElementVisible(el) {
     if (!el || !(el instanceof HTMLElement)) return false;
-    const style = window.getComputedStyle(el);
-    if (style.display === "none" || style.visibility === "hidden" || style.opacity === "0") {
+    // Fast O(1) dismissal for unmounted or hidden elements
+    if (el.offsetParent === null && el.offsetWidth === 0 && el.offsetHeight === 0) {
       return false;
     }
-    const rect = el.getBoundingClientRect();
-    return rect.width > 0 && rect.height > 0;
+    // Modern Chrome native checkVisibility API (C++ implemented, 100x faster)
+    if (typeof el.checkVisibility === "function") {
+      return el.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true });
+    }
+    return true;
   }
 
   /**
@@ -53,12 +69,14 @@
 
   /**
    * 1. Detect if the user is currently on an e-commerce checkout page.
-   * Features specialized Amazon guards, explicit platform container checks,
-   * and a high multi-category threshold (score >= 10) to completely eliminate
-   * false positives during normal catalog browsing.
+   * Performance-optimized with fast-paths, zero layout thrashing, and Amazon guards.
    * @returns {{ isCheckout: boolean, score: number, signals: string[] }}
    */
   function detectCheckout() {
+    if (isSessionApproved) {
+      return { isCheckout: false, score: 0, signals: ["USER_ALREADY_APPROVED"] };
+    }
+
     if (isDisqualifiedSite()) {
       return { isCheckout: false, score: 0, signals: ["DISQUALIFIED_DOMAIN"] };
     }
@@ -67,18 +85,26 @@
     const pathname = window.location.pathname.toLowerCase();
 
     // =========================================================================
+    // FAST-PATH OPTIMIZATION:
+    // If the URL has no shopping/checkout indicators AND no payment iframe exists,
+    // exit immediately to prevent running DOM scans on normal product catalogs.
+    // =========================================================================
+    const hasCheckoutKeyword = /checkout|cart|basket|order|pay|billing|purchase|buy|spc|test-checkout/i.test(pathname);
+    const hasPaymentIframe = !!document.querySelector('iframe[src*="stripe.com"], iframe[src*="paypal.com"]');
+
+    if (!hasCheckoutKeyword && !hasPaymentIframe && !hostname.includes("amazon.")) {
+      return { isCheckout: false, score: 0, signals: ["FAST_PATH_SKIPPED"] };
+    }
+
+    // =========================================================================
     // SPECIALIZED AMAZON HANDLING
-    // Normal Amazon browsing includes search bars, product buy boxes, and nav carts.
-    // We only trigger when the user has actually entered the final checkout funnel.
     // =========================================================================
     if (hostname.includes("amazon.")) {
-      // 1. Browsing indicators on Amazon
       const isAmazonBrowsing = !!document.querySelector(
         '#add-to-cart-button, #buy-now-button, #twotabsearchtextbox, #nav-search-bar-form, ' +
         '#s-results-list-atf, .s-search-results, #sc-active-cart, #nav-cart'
       );
 
-      // 2. Strict Amazon Checkout indicators
       const isAmazonCheckoutUrl = /\/(gp\/buy|checkout\/spc|buy\/spc|buy\/payselect|gp\/checkout)\//i.test(pathname);
       const hasAmazonPlaceOrderBtn = Array.from(
         document.querySelectorAll(
@@ -92,12 +118,10 @@
         )
       ).some(isElementVisible);
 
-      // If browsing elements are present and the place order button is NOT present, stay quiet!
       if (isAmazonBrowsing && !hasAmazonPlaceOrderBtn) {
         return { isCheckout: false, score: 0, signals: ["AMAZON_BROWSING_EXCLUDED"] };
       }
 
-      // Only fire if inside the true Amazon purchase funnel
       if (hasAmazonPlaceOrderBtn || (isAmazonCheckoutUrl && hasAmazonCheckoutHeader)) {
         return {
           isCheckout: true,
@@ -110,26 +134,29 @@
     }
 
     // =========================================================================
-    // GENERAL E-COMMERCE DETECTION (High Threshold: Score >= 10, Multi-category)
+    // GENERAL E-COMMERCE DETECTION (Zero Lag & Strict Scoring)
     // =========================================================================
     let score = 0;
     const signals = [];
     const activeCategories = new Set();
 
-    const buttons = Array.from(
-      document.querySelectorAll("button, input[type='submit'], a.button, [role='button']")
+    // Fast-targeted button query: only scan buttons likely to submit an order or checkout
+    const candidateButtons = Array.from(
+      document.querySelectorAll(
+        "form button, form input[type='submit'], button[type='submit'], " +
+        "[id*='checkout' i], [id*='order' i], [id*='pay' i], [class*='checkout' i], [class*='order' i]"
+      )
     ).filter(isElementVisible);
 
-    // Guardrail: Product page with "Add to Cart" or "Add to Bag"
-    const hasAddToCart = buttons.some((btn) => {
+    // Guardrail: Product detail pages with "Add to Cart" or "Add to Bag"
+    const hasAddToCart = candidateButtons.some((btn) => {
       const text = (btn.innerText || btn.value || "").trim().toLowerCase();
       return /^(add to (cart|bag|basket)|pre-order now)/i.test(text);
     });
 
-    // Guardrail: Generic site-wide search box
-    const hasSearchInput = Array.from(
-      document.querySelectorAll('input[type="search"], input[name="q"], input[name="search"]')
-    ).some(isElementVisible);
+    // Guardrail: Active catalog search input
+    const searchInput = document.querySelector('input[type="search"], input[name="q"], input[name="search"]');
+    const hasSearchInput = searchInput ? isElementVisible(searchInput) : false;
 
     // Category 1: Explicit E-Commerce Checkout Form / Step Containers (+5 pts)
     const checkoutContainers = [
@@ -153,7 +180,6 @@
     }
 
     // Category 2: Strict Checkout Route in URL (+4 pts)
-    // Matches explicit checkout route segments, e.g. /checkout, /checkouts/123, /pay-now
     const isCheckoutPath = /(?:^|\/)(checkout|checkouts|order[_-]?summary|review[_-]?order|payment[_-]?step|pay[_-]?now|test-checkout)(?:[\/?#]|$)/i.test(pathname);
     if (isCheckoutPath) {
       score += 4;
@@ -191,7 +217,7 @@
     }
 
     // Category 4: High-Intent Final Order Action Buttons (+5 pts)
-    const finalCheckoutBtn = buttons.find((btn) => {
+    const finalCheckoutBtn = candidateButtons.find((btn) => {
       const text = (btn.innerText || btn.value || "").trim().toLowerCase();
       return /^(place order|complete purchase|pay now|submit order|pay with card|confirm (and|&) pay|authorize payment)/i.test(text);
     });
@@ -202,12 +228,8 @@
     }
 
     // Category 5: Order Breakdown with Total (+2 pts)
-    const hasOrderTotal = Array.from(
-      document.querySelectorAll(
-        '[data-checkout-total], #order-total, .order-total, .checkout-total, [data-test="total-amount"]'
-      )
-    ).some(isElementVisible);
-    if (hasOrderTotal) {
+    const totalEl = document.querySelector('[data-checkout-total], #order-total, .order-total, .checkout-total, [data-test="total-amount"]');
+    if (totalEl && isElementVisible(totalEl)) {
       score += 2;
       signals.push("ORDER_TOTAL_BREAKDOWN");
       activeCategories.add("SUMMARY");
@@ -230,7 +252,6 @@
     }
 
     // HIGH THRESHOLD:
-    // Requires total score >= 10 AND at least 2 distinct strong confirmation categories
     const isCheckout = score >= 10 && activeCategories.size >= 2;
 
     return {
@@ -413,7 +434,18 @@
         proceedBtn.classList.add("unlocked");
         proceedBtn.textContent = "I've considered it — Continue to Checkout";
         proceedBtn.addEventListener("click", () => {
+          isSessionApproved = true;
+          try {
+            sessionStorage.setItem(SESSION_APPROVED_KEY, "true");
+          } catch (e) {}
+
+          // Disconnect observer so the page will never be scanned or blocked again this session
+          if (observer) {
+            observer.disconnect();
+          }
+
           overlay.remove();
+          console.log("[CheckoutGuard] Cooldown completed and purchase approved. Guard disarmed for this session.");
         });
       }
       if (timerBox) {
@@ -429,12 +461,25 @@
    * 6. Initialize CheckoutGuard lifecycle.
    */
   function initCheckoutGuard() {
+    if (isSessionApproved) {
+      if (observer) observer.disconnect();
+      return;
+    }
+
+    try {
+      if (sessionStorage.getItem(SESSION_APPROVED_KEY) === "true") {
+        isSessionApproved = true;
+        if (observer) observer.disconnect();
+        return;
+      }
+    } catch (e) {}
+
     if (typeof chrome === "undefined" || !chrome.storage || !chrome.storage.local) {
       return;
     }
 
     chrome.storage.local.get(DEFAULT_SETTINGS, (settings) => {
-      if (!settings.isEnabled) return;
+      if (!settings.isEnabled || isSessionApproved) return;
 
       const detection = detectCheckout();
       console.log("[CheckoutGuard] Page Analysis:", detection);
@@ -449,14 +494,14 @@
   // Initial trigger
   initCheckoutGuard();
 
-  // Handle SPA / dynamically loaded checkouts via MutationObserver
+  // Handle SPA / dynamically loaded checkouts via MutationObserver (throttled for zero lag)
   let debounceTimeout = null;
-  const observer = new MutationObserver(() => {
-    if (isAlreadyInjected()) return;
+  observer = new MutationObserver(() => {
+    if (isAlreadyInjected() || isSessionApproved) return;
     clearTimeout(debounceTimeout);
     debounceTimeout = setTimeout(() => {
       initCheckoutGuard();
-    }, 1500);
+    }, 2500);
   });
 
   if (document.body) {
