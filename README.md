@@ -1,6 +1,6 @@
 # Adaptive Credit Guard
 
-A React prototype for the Capital One Making Credit Accessible hackathon. The demo uses a simulated UK credit card account and runs entirely in the browser. Refreshing or resetting restores the fixture.
+A React prototype for the Capital One Making Credit Accessible hackathon, with a CheckoutGuard extension for Chrome and Firefox. The demo uses a simulated UK credit card account and runs entirely in the browser. Refreshing or resetting restores the fixture.
 
 ## Run the prebuilt demo offline
 
@@ -40,5 +40,19 @@ The web gauge previews the typed purchase without changing the account balance. 
 For the Chrome extension, load `checkout-guard` as an unpacked extension from `chrome://extensions` with Developer mode enabled. Its gauge measures the monthly budget: green below 80%, amber from 80% through 100%, and red above 100%. With a £300 budget, type £120, £240 and £360 into Current Month Spend and check the allowance and colour update immediately. Save Changes persists valid settings. Empty amounts, negative spend and a zero budget cannot be saved. Reset Demo restores £300/£120. Opening `checkout-guard/popup.html` outside the extension previews the same calculations without saving settings.
 
 Open `checkout-guard/test-checkout.html` to check the projected checkout gauge; enable “Allow access to file URLs” in the extension details if opening the file directly. With £250 spent of a £300 budget, the £69.99 order shows red, 106.66% used and £0 remaining.
+
+## Load the extension in Firefox
+
+Use desktop Firefox 142 or newer. Chrome and Firefox use the same `checkout-guard` folder and manifest; no build step or separate extension source is needed. Budget settings are stored locally in each browser and do not sync between browsers.
+
+1. Open `about:debugging#/runtime/this-firefox` in Firefox.
+2. Click **Load Temporary Add-on…** and select `checkout-guard/manifest.json`.
+3. Open **CheckoutGuard** from the extensions toolbar menu to set your budget and current spend, then click **Save Changes**.
+4. To test locally, run `python3 -m http.server 4180 --bind 127.0.0.1` from the repository root and visit `http://127.0.0.1:4180/checkout-guard/test-checkout.html`.
+5. Check the detected £69.99 order, projected gauge, countdown and Continue button. Turning the guard off in its popup suppresses warnings on newly loaded checkout pages.
+
+After pulling updates, click **Reload** beside the extension on the debugging page and refresh the checkout tab. Temporary add-ons are removed when Firefox restarts; repeat the loading steps after restarting. Permanent installation requires Mozilla signing; this repository has not been submitted or published. See [Mozilla's temporary installation guide](https://extensionworkshop.com/documentation/develop/temporary-installation-in-firefox/).
+
+Firefox validation: `npx web-ext lint --source-dir checkout-guard`. The manifest includes a stable Firefox ID and declares no collection or transmission of data outside the extension. Checkout totals are read locally and preferences stay in browser-local storage.
 
 See `project-brief.md` for the pitch, six-slide outline and judge Q&A.

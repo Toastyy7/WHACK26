@@ -340,6 +340,9 @@
     const percentLabel = new Intl.NumberFormat('en-GB', { maximumFractionDigits: 2 }).format(percentUsed);
 
     let gaugeClass = "";
+    const configuredCooldown = Number(settings.cooldownSeconds);
+    const cooldownDuration = Number.isInteger(configuredCooldown) && configuredCooldown > 0
+      ? configuredCooldown : DEFAULT_SETTINGS.cooldownSeconds;
     let statusText = "Within your budget";
     if (percentUsed >= 80 && percentUsed <= 100) {
       gaugeClass = "warning";
@@ -362,28 +365,26 @@
         <div class="cg-impact-card">
           <div class="cg-impact-row">
             <span>Detected Order:</span>
-            <strong>£${purchaseAmount.toFixed(2)}</strong>
+            <strong id="cg-order-amount"></strong>
           </div>
           <div class="cg-impact-row">
             <span>Current Spent:</span>
-            <span>£${spent.toFixed(2)} of £${budget.toFixed(2)}</span>
+            <span id="cg-current-spent"></span>
           </div>
           <div class="cg-impact-row">
             <span>Remaining after purchase:</span>
-            <strong>£${remainingBudget.toFixed(2)}</strong>
+            <strong id="cg-remaining"></strong>
           </div>
           
-          <div class="cg-gauge-bar" title="${percentUsed}% of budget used">
-            <div class="cg-gauge-fill ${gaugeClass}" style="width: ${Math.min(100, percentUsed)}%;"></div>
+          <div class="cg-gauge-bar">
+            <div class="cg-gauge-fill"></div>
           </div>
-          <div style="margin-top: 6px; font-size: 12px; color: #64748b; text-align: right;">
-            ${statusText} (${percentLabel}%)
-          </div>
+          <div id="cg-budget-status" style="margin-top: 6px; font-size: 12px; color: #64748b; text-align: right;"></div>
         </div>
 
         <div class="cg-timer-box">
           <span>⏳ Cooldown pause:</span>
-          <span id="cg-timer-seconds" class="cg-timer-seconds">${settings.cooldownSeconds || 15}s</span>
+          <span id="cg-timer-seconds" class="cg-timer-seconds"></span>
         </div>
 
         <div class="cg-actions">
@@ -397,6 +398,15 @@
       </div>
     `;
 
+    overlay.querySelector('#cg-order-amount').textContent = `£${purchaseAmount.toFixed(2)}`;
+    overlay.querySelector('#cg-current-spent').textContent = `£${spent.toFixed(2)} of £${budget.toFixed(2)}`;
+    overlay.querySelector('#cg-remaining').textContent = `£${remainingBudget.toFixed(2)}`;
+    overlay.querySelector('.cg-gauge-bar').title = `${percentLabel}% of budget used`;
+    const fill = overlay.querySelector('.cg-gauge-fill');
+    if (gaugeClass) fill.classList.add(gaugeClass);
+    fill.style.width = `${Math.min(100, percentUsed)}%`;
+    overlay.querySelector('#cg-budget-status').textContent = `${statusText} (${percentLabel}%)`;
+    overlay.querySelector('#cg-timer-seconds').textContent = `${cooldownDuration}s`;
     document.body.appendChild(overlay);
 
     // Event 1: Step Away (Close tab or redirect to safety)
@@ -410,7 +420,6 @@
     });
 
     // Event 2: Start cooldown countdown to unlock proceed button
-    const cooldownDuration = parseInt(settings.cooldownSeconds, 10) || 15;
     startCooldownTimer(cooldownDuration, () => {
       const proceedBtn = document.getElementById("cg-proceed");
       const timerBox = document.querySelector(".cg-timer-box");
