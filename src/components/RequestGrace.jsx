@@ -88,32 +88,47 @@ export default function RequestGrace({ account, updateAccount, timer }) {
         <>
           <h3>Review your message</h3>
           <blockquote>{draft}</blockquote>
+          <div className="scor-review-note" style={{ display: 'flex', gap: '8px', alignItems: 'center', background: 'var(--soft)', padding: '10px 14px', borderRadius: '8px', marginBottom: '14px', fontSize: '0.85rem' }}>
+            <span>⚠️</span>
+            <span>Formal forbearance requests carry potential credit file implications. Review the advisory before sending.</span>
+          </div>
           <div className="actions">
             <button onClick={() => {
               setTermsAccepted(false);
               disclaimer.current.showModal();
-            }}>Continue to disclaimer</button>
+            }}>Continue to regulatory disclaimer</button>
             <button className="secondary" onClick={() => setStatus('editing')}>
               Edit message
             </button>
           </div>
         </>
       )}
-      <dialog ref={disclaimer} aria-labelledby="grace-disclaimer-title">
+      <dialog ref={disclaimer} aria-labelledby="grace-disclaimer-title" style={{ maxWidth: '540px', padding: '24px', borderRadius: '14px', border: '1px solid var(--line)', background: 'var(--surface)', color: 'var(--text)' }}>
         <h3 id="grace-disclaimer-title">Before you request grace</h3>
-        <p>Grace requests are not always accepted. Each request needs a lender decision.</p>
-        <h4>Simple terms</h4>
+        <p>Grace requests are not automatic. The lender will assess the support available for your circumstances.</p>
+
+        <div className="scor-advisory" style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '10px', padding: '14px', margin: '14px 0', color: '#92400e' }} role="note">
+          <h4 style={{ margin: '0 0 6px 0', color: '#78350f' }}>⚠️ SCOR credit-file advisory</h4>
+          <p style={{ margin: '0 0 6px 0', fontSize: '0.85rem', lineHeight: 1.4 }}>
+            Contacting your lender to ask for help does not itself affect your credit file. If you agree a reduced-payment, payment-pause or other support arrangement, the lender may report that arrangement to credit reference agencies.
+          </p>
+          <p style={{ margin: 0, fontSize: '0.85rem', lineHeight: 1.4 }}>
+            FCA guidance says the lender should explain how any option affects interest, fees, your balance and credit-file reporting before you agree it. A reported arrangement can affect future borrowing decisions, but missing payments can also be reported.
+          </p>
+        </div>
+
+        <h4>Terms of request</h4>
         <ul>
-          <li>Sending a request does not change your existing payment obligations.</li>
-          <li>Any arrangement only starts when your lender confirms its terms.</li>
-          <li>This is a demo: no request is sent and decisions are random.</li>
+          <li>Sending a request does not change your existing payment obligations until agreed.</li>
+          <li>Any arrangement only starts when the lender confirms its terms.</li>
+          <li>Interest or charges may continue unless the lender agrees to reduce, waive or suspend them.</li>
         </ul>
-        <label className="check">
+        <label className="check" style={{ fontWeight: 650, marginTop: '14px' }}>
           <input type="checkbox" checked={termsAccepted}
             onChange={(event) => setTermsAccepted(event.target.checked)} />
-          I understand these terms.
+          I understand that an agreed support arrangement may be reported on my credit file and wish to submit this request in writing.
         </label>
-        <div className="actions">
+        <div className="actions" style={{ marginTop: '16px' }}>
           <button disabled={!termsAccepted} onClick={send}>Confirm and send</button>
           <button className="secondary" onClick={() => disclaimer.current.close()}>Go back</button>
         </div>

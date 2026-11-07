@@ -420,10 +420,39 @@
         savingPurchase = false;
       }
     });
-    find('#cg-step-away').addEventListener('click', () => {
-      close(true);
-      if (window.history.length > 1) window.history.back();
-      else window.location.assign('about:blank');
+    find('#cg-step-away').addEventListener('click', async () => {
+      if (savingPurchase) return;
+      const amount = total ?? manualAmount;
+      if (!Number.isSafeInteger(amount) || amount <= 0) {
+        find('#cg-budget-status').textContent = 'Enter a GBP amount greater than £0 to save this checkout for later.';
+        amountInput.focus();
+        return;
+      }
+      savingPurchase = true;
+      const button = find('#cg-step-away');
+      button.disabled = true;
+      button.textContent = 'Saving for later…';
+      const savedAt = Date.now();
+      try {
+        await guard.queueCoolingItem({
+          version: 1,
+          id: purchaseId,
+          title: (document.title.trim() || 'Online checkout').slice(0, 160),
+          store: location.hostname.replace(/^www\./, '').slice(0, 100),
+          amount,
+          savedAt,
+          expiresAt: savedAt + 30 * 60 * 1000,
+        });
+        close(true);
+        if (window.history.length > 1) window.history.back();
+        else window.location.assign('about:blank');
+      } catch (error) {
+        find('#cg-budget-status').textContent = `Could not save this checkout: ${error.message} Try again.`;
+        button.disabled = false;
+        button.textContent = 'Retry leaving checkout';
+      } finally {
+        savingPurchase = false;
+      }
     });
     render();
     document.body.appendChild(overlay);

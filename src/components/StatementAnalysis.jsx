@@ -4,6 +4,7 @@ import { formatMoney, formatPercent } from '../utils/format.js';
 import { includedTransactions } from '../statements/selection.js';
 import AddTransactionForm from './AddTransactionForm.jsx';
 import { appendManualTransaction, importedTransactions } from '../statements/manualTransactions.js';
+import { getDemoStatement } from '../statements/demoStatement.js';
 
 export default function StatementAnalysis({ savedStatement, onSave, onClear, onViewHome, onSelect }) {
   // App owns saved results so Home and this screen always use the same transactions.
@@ -24,6 +25,20 @@ export default function StatementAnalysis({ savedStatement, onSave, onClear, onV
     setBusy(false);
     setError('');
     if (input.current) input.current.value = '';
+  }
+
+  function loadDemo() {
+    uploadId.current += 1;
+    setError('');
+    setBusy(false);
+    setPendingFileName('');
+    const manual = savedStatement?.result.transactions.filter((row) => row.source === 'manual' || row.source === 'checkout') ?? [];
+    const demo = getDemoStatement();
+    onSave({
+      fileName: 'Capital-One-Statement-Oct2026.pdf',
+      result: { ...demo, transactions: [...demo.transactions, ...manual] },
+      savedAt: Date.now(),
+    });
   }
 
   async function upload(event) {
@@ -79,6 +94,13 @@ export default function StatementAnalysis({ savedStatement, onSave, onClear, onV
       <h2>Understand your outgoing spending</h2>
       <p>Upload a bank statement to group outgoing payments into general spending categories.</p>
       <p className="muted">Your PDF is processed on this device. It is not uploaded to a server. Extracted transactions and category edits are saved in this browser and shown on Home. The PDF itself is not saved. Clear the statement or reset the demo to delete saved results.</p>
+      <div className="demo-statement-box">
+        <strong>Stage presentation demo</strong>
+        <p className="muted">Test instant categorisation with a pre-configured Capital One statement without uploading a file.</p>
+        <button type="button" className="secondary" onClick={loadDemo} disabled={busy}>
+          ⚡ Load sample statement (October 2026)
+        </button>
+      </div>
       <label>
         GBP bank statement (PDF, up to 20 MB)
         <input ref={input} type="file" accept="application/pdf,.pdf" onChange={upload} disabled={busy} />

@@ -124,9 +124,41 @@
     return () => event.removeListener(handle);
   }
 
+  const coolingPrefix = 'checkoutGuard.cooling.';
+  function validCoolingItem(item) {
+    return item?.version === 1 && typeof item.id === 'string' && /^[a-zA-Z0-9-]{1,100}$/.test(item.id) &&
+      Number.isSafeInteger(item.amount) && item.amount > 0 && item.amount <= 999999999 &&
+      typeof item.title === 'string' && item.title.length > 0 && item.title.length <= 160 &&
+      typeof item.store === 'string' && item.store.length > 0 && item.store.length <= 100 &&
+      Number.isSafeInteger(item.savedAt) && Number.isSafeInteger(item.expiresAt) && item.expiresAt > item.savedAt;
+  }
+
+  async function queueCoolingItem(item) {
+    if (!validCoolingItem(item)) throw new Error('Enter a valid GBP amount before leaving checkout.');
+    await storage('set', { [coolingPrefix + item.id]: item });
+  }
+
+  async function pendingCoolingItems() {
+    const data = await storage('get', null);
+    return Object.entries(data).filter(([key, value]) =>
+      key === coolingPrefix + value?.id && validCoolingItem(value)).map(([, value]) => value);
+  }
+
+  function subscribeCoolingItems(listener) {
+    const event = api()?.extension.storage.onChanged;
+    if (!event) return () => {};
+    const handle = (changes, area) => {
+      if (area === 'local' && Object.keys(changes).some((key) => key.startsWith(coolingPrefix))) listener();
+    };
+    event.addListener(handle);
+    return () => event.removeListener(handle);
+  }
+
   globalThis.CheckoutGuard = Object.freeze({
     queuePurchase, pendingPurchases, subscribePurchases, validPurchase,
     acknowledgePurchase: (id) => storage('remove', purchasePrefix + id),
+    queueCoolingItem, pendingCoolingItems, subscribeCoolingItems, validCoolingItem,
+    acknowledgeCoolingItem: (id) => storage('remove', coolingPrefix + id),
     defaults, pence, parseGbp, normalise, validSettings, money, percent, impact,
     available: () => api() !== null,
     load: async () => normalise(await storage('get', defaults)),

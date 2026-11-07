@@ -8,14 +8,19 @@
   const guard = globalThis.CheckoutGuard;
   if (!guard?.available() || !origins.has(location.origin) || window.top !== window) return;
   let ready = false;
-  const offered = new Set();
+  const offeredPurchases = new Set();
+  const offeredCooling = new Set();
 
   async function deliver() {
     if (!ready || !document.querySelector('meta[name="checkout-guard-dashboard"][content="v1"]')) return;
     try {
       for (const purchase of await guard.pendingPurchases()) {
-        offered.add(purchase.id);
+        offeredPurchases.add(purchase.id);
         window.postMessage({ source: 'checkout-guard-extension', type: 'purchase', purchase }, location.origin);
+      }
+      for (const item of await guard.pendingCoolingItems()) {
+        offeredCooling.add(item.id);
+        window.postMessage({ source: 'checkout-guard-extension', type: 'cooling-item', item }, location.origin);
       }
     } catch (error) { console.warn('[CheckoutGuard] Sync pending:', error.message); }
   }
@@ -25,14 +30,20 @@
     if (event.data.type === 'ready') {
       ready = true;
       await deliver();
-    } else if (event.data.type === 'purchase-saved' && offered.has(event.data.id)) {
+    } else if (event.data.type === 'purchase-saved' && offeredPurchases.has(event.data.id)) {
       try {
         await guard.acknowledgePurchase(event.data.id);
-        offered.delete(event.data.id);
+        offeredPurchases.delete(event.data.id);
       } catch (error) { console.warn('[CheckoutGuard] Acknowledgement pending:', error.message); }
+    } else if (event.data.type === 'cooling-item-saved' && offeredCooling.has(event.data.id)) {
+      try {
+        await guard.acknowledgeCoolingItem(event.data.id);
+        offeredCooling.delete(event.data.id);
+      } catch (error) { console.warn('[CheckoutGuard] Reflection queue acknowledgement pending:', error.message); }
     }
   });
   guard.subscribePurchases(deliver);
+  guard.subscribeCoolingItems(deliver);
   // Handshake works whether the extension or React starts listening first.
   window.postMessage({ source: 'checkout-guard-extension', type: 'bridge-ready' }, location.origin);
   setInterval(deliver, 5000);

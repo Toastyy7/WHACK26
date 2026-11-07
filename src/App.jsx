@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { createInitialAccount } from './account.js';
 import AccountOverview from './components/AccountOverview.jsx';
 import SafeZoneGauge from './components/SafeZoneGauge.jsx';
+import ImpulseCoolingQueue from './components/ImpulseCoolingQueue.jsx';
 import RequestGrace from './components/RequestGrace.jsx';
 import DemoControls from './components/DemoControls.jsx';
 import NavigationMenu from './components/NavigationMenu.jsx';
@@ -12,6 +13,7 @@ import useSavedStatement from './hooks/useSavedStatement.js';
 import { setTransactionIncluded } from './statements/selection.js';
 import { monthlyBalance } from './statements/monthlyBalance.js';
 import useCurrentMonth from './hooks/useCurrentMonth.js';
+import useCoolingQueue from './hooks/useCoolingQueue.js';
 
 // App owns the data shared by the panels below. Props pass that data to each panel.
 export default function App() {
@@ -20,6 +22,7 @@ export default function App() {
   // Navigation changes the visible screen without discarding account data or drafts.
   const [page, setPage] = useState('home');
   const { savedStatement, updateSavedStatement, storageError } = useSavedStatement();
+  const { queue, addCoolingItem, dismissCoolingItem, resetCoolingQueue, coolingError } = useCoolingQueue();
   const [statementKey, setStatementKey] = useState(0);
   const heading = useRef(null);
   const [account, setAccount] = useState(createInitialAccount);
@@ -59,6 +62,7 @@ export default function App() {
     clearTimeout(timer.current);
     timer.current = null;
     setAccount(createInitialAccount());
+    resetCoolingQueue();
     clearStatement();
     setPage('home');
     // Remount the panels to clear local inputs and close the demo controls.
@@ -82,11 +86,18 @@ export default function App() {
         <p>{{ home: 'See what you owe and what you can do next.', grace: 'Send a written request and follow its progress.', statements: 'See where your money goes.' }[page]}</p>
       </div>
       {storageError && <p className="notice" role="alert">{storageError}</p>}
+      {coolingError && <p className="notice" role="alert">{coolingError}</p>}
       <div key={resetKey}>
         {/* Keep screens mounted so navigating home preserves the request and preview. */}
         <div hidden={page !== 'home'}>
           <AccountOverview account={displayedAccount} monthlyOutgoing={adjustment.outgoing} month={month} />
           <SafeZoneGauge account={displayedAccount} />
+          <ImpulseCoolingQueue
+            items={queue.items}
+            savings={queue.savings}
+            onDismiss={dismissCoolingItem}
+            onAddSimulated={addCoolingItem}
+          />
           {savedStatement && <HomeSpendingSummary
             key={`${savedStatement.fileName}-${savedStatement.savedAt}`}
             statement={savedStatement}

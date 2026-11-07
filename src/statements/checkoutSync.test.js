@@ -65,6 +65,11 @@ test('extension queues checkouts and bridge delivers only to the local dashboard
   vm.runInNewContext(readFileSync(new URL('../../checkout-guard/core.js', import.meta.url), 'utf8'), sandbox);
   const guard = sandbox.CheckoutGuard;
   await guard.queuePurchase(purchase);
+  const coolingItem = {
+    version: 1, id: 'cooling-one', title: 'Wireless headphones', store: 'example.shop', amount: 6999,
+    savedAt: 1000000, expiresAt: 2800000,
+  };
+  await guard.queueCoolingItem(coolingItem);
   const messages = [];
   const listeners = [];
   const window = { addEventListener: (_, fn) => listeners.push(fn), postMessage: (message) => messages.push(message) };
@@ -76,12 +81,16 @@ test('extension queues checkouts and bridge delivers only to the local dashboard
   assert.equal(messages.some((message) => message.type === 'purchase'), false);
   await listeners[0]({ source: window, origin, data: { source: 'credit-guard-dashboard', type: 'ready' } });
   const offered = messages.find((message) => message.type === 'purchase');
+  const offeredCooling = messages.find((message) => message.type === 'cooling-item');
   assert.equal(offered.purchase.amount, 6999);
+  assert.equal(offeredCooling.item.title, 'Wireless headphones');
   assert.equal((await guard.pendingPurchases()).length, 1);
   const saved = receiveCheckout(memoryStorage(), null, offered.purchase);
   assert.equal(saved.result.transactions.length, 1);
   await listeners[0]({ source: window, origin, data: { source: 'credit-guard-dashboard', type: 'purchase-saved', id: purchase.id } });
+  await listeners[0]({ source: window, origin, data: { source: 'credit-guard-dashboard', type: 'cooling-item-saved', id: coolingItem.id } });
   assert.equal((await guard.pendingPurchases()).length, 0);
+  assert.equal((await guard.pendingCoolingItems()).length, 0);
 
   const blocked = [];
   const other = { addEventListener: () => blocked.push('listener'), postMessage: () => blocked.push('message') };
