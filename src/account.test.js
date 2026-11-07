@@ -21,6 +21,10 @@ test('purchase preview is pure and handles the target and half-limit boundaries'
     'Using at least half your limit',
   );
   assert.equal(state.balance, 28000);
+  assert.equal(gauge(108000, state.limit, state.target).label, 'Credit limit exceeded');
+  assert.equal(pence('.50'), 50);
+  assert.equal(pence('12.'), 1200);
+  assert.equal(pence(null), null);
   assert.equal(pence('12.05'), 1205);
   assert.equal(pence('12.005'), null);
 });

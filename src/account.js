@@ -1,6 +1,6 @@
 // All account amounts are integer pence. Convert to pounds only for display.
 export const initial = () => ({
-  adaptive: false,
+  adaptive: true,
   balance: 28000,
   limit: 100000,
   minimum: 2500,
@@ -19,8 +19,10 @@ export const initial = () => ({
 
 // Parse typed pounds without floating-point arithmetic. Null means invalid input.
 export function pence(value) {
-  if (!/^\d{1,7}(\.\d{1,2})?$/.test(value)) return null;
-  const [pounds, fraction = ''] = value.split('.');
+  if (typeof value !== 'string') return null;
+  const text = value.trim().replace(/^\./, '0.');
+  if (!/^\d{1,7}(\.\d{0,2})?$/.test(text)) return null;
+  const [pounds, fraction = ''] = text.split('.');
   return Number(pounds) * 100 + Number(fraction.padEnd(2, '0'));
 }
 
@@ -31,11 +33,13 @@ export function gauge(balance, limit, target) {
     zone: percentage >= 50 ? 'danger' : percentage >= target ? 'warning' : 'safe',
     threshold: Math.ceil((limit * target) / 100),
     label:
-      percentage >= 50
-        ? 'Using at least half your limit'
-        : percentage >= target
-          ? 'At or above your target'
-          : 'Within your target',
+      balance > limit
+        ? 'Credit limit exceeded'
+        : percentage >= 50
+          ? 'Using at least half your limit'
+          : percentage >= target
+            ? 'At or above your target'
+            : 'Within your target',
   };
 }
 

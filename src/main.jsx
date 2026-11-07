@@ -14,7 +14,7 @@ const percent = (amount) =>
   new Intl.NumberFormat('en-GB', { maximumFractionDigits: 2 }).format(amount) +
   '%';
 
-function Gauge({ account }) {
+function Gauge({ account, update }) {
   // A what-if purchase stays local to the preview and never changes the ledger.
   const [purchase, setPurchase] = useState('');
   const { balance, limit, target } = account;
@@ -46,6 +46,18 @@ function Gauge({ account }) {
         <span style={{ width: `${Math.min(100, displayed.percentage)}%` }} />
       </div>
       <p className={`badge ${displayed.zone}`}>{displayed.label}</p>
+      <label className="target-control">
+        Credit limit target (%) · {target}% ({money(current.threshold)})
+        <input
+          type="range"
+          min="1"
+          max="49"
+          value={target}
+          onChange={(event) => update({ target: Number(event.target.value) })}
+          aria-describedby="target-hint"
+        />
+      </label>
+      <p id="target-hint" className="hint">Amber starts at your target; red starts at 50%. This is a planning aid, not a credit-score prediction.</p>
       <label>
         What would a purchase cost (£)?
         <input
@@ -56,6 +68,7 @@ function Gauge({ account }) {
           aria-invalid={purchase !== '' && amount === null}
         />
       </label>
+      <p className="hint">Preview only. Your actual balance stays the same.</p>
       <button
         className="secondary"
         onClick={() => setPurchase('')}
@@ -115,7 +128,7 @@ function Payments({ account, update, fail }) {
           <input
             required
             inputMode="decimal"
-            pattern={'[0-9]{1,7}(\\.[0-9]{1,2})?'}
+            pattern={'([0-9]{1,7}(\\.[0-9]{0,2})?|\\.[0-9]{1,2})'}
             value={buffer}
             onChange={(e) => setBuffer(e.target.value)}
           />
@@ -205,7 +218,7 @@ function Support({ account, update, fail, timer }) {
     <section className="card">
       <p className="eyebrow">03 / SILENT GRACE</p>
       <h2>Ask for payment support</h2>
-      <p>Send a written request and follow its status here.</p>
+      <p>Send a written request and follow its status here. Your payment remains due until the lender confirms an arrangement.</p>
       <div role="status">
         {support.status === 'submitting' && <p>Sending your request…</p>}
         {support.status === 'failed' && (
@@ -245,7 +258,10 @@ function Support({ account, update, fail, timer }) {
               onChange={(e) => update({ draft: e.target.value })}
             />
           </label>
-          <button disabled={!draft.trim()}>Review message</button>
+          <div className="actions">
+            <button disabled={!draft.trim()}>Review message</button>
+            <button type="button" className="secondary" onClick={() => setStatus('draft')}>Cancel</button>
+          </div>
         </form>
       )}
       {support.status === 'review' && (
@@ -296,23 +312,6 @@ function DemoControls({ account, update, fail, setFail }) {
             <option value="stale">Stale</option>
             <option value="missing">Unavailable</option>
           </select>
-        </label>
-        <label>
-          Credit limit target (%)
-          <input
-            type="number"
-            min="1"
-            max="49"
-            step="1"
-            key={account.target}
-            defaultValue={account.target}
-            onBlur={(e) => {
-              const target = Number(e.target.value);
-              if (Number.isInteger(target) && target >= 1 && target <= 49)
-                update({ target });
-              else e.target.value = account.target;
-            }}
-          />
         </label>
         <label className="check">
           <input
@@ -397,9 +396,13 @@ function App() {
           <span>Credit limit</span>
           <strong>{money(account.limit)}</strong>
         </div>
+        <div>
+          <span>Available credit</span>
+          <strong>{money(Math.max(0, account.limit - account.balance))}</strong>
+        </div>
         <div aria-live="polite">
           <span>
-            {account.adaptive
+            {account.adaptive && account.minimum > 0
               ? 'Next action · pay your remaining minimum'
               : 'Remaining statement minimum'}
           </span>
@@ -411,7 +414,7 @@ function App() {
       </section>
       <div key={resetKey}>
         <div className="grid" hidden={!account.adaptive}>
-          <Gauge account={account} />
+          <Gauge account={account} update={update} />
           <Payments account={account} update={update} fail={fail.payment} />
           <Support
             account={account}

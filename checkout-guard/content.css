@@ -18,6 +18,9 @@
 }
 
 #checkout-guard-modal {
+  position: relative !important;
+  max-height: calc(100vh - 40px) !important;
+  overflow-y: auto !important;
   background: #ffffff !important;
   border-radius: 18px !important;
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35) !important;
@@ -28,6 +31,67 @@
   animation: cgFadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
   box-sizing: border-box !important;
   border: 1px solid #e2e8f0 !important;
+}
+
+#checkout-guard-overlay [hidden] { display: none !important; }
+#checkout-guard-overlay button:focus-visible,
+#checkout-guard-overlay input:focus-visible,
+#checkout-guard-modal:focus-visible {
+  outline: 3px solid #b45309 !important;
+  outline-offset: 3px !important;
+}
+#checkout-guard-overlay #cg-close {
+  position: absolute !important;
+  top: 8px !important;
+  right: 12px !important;
+  width: 32px !important;
+  height: 32px !important;
+  font: 24px/1 system-ui, sans-serif !important;
+  border: 0 !important;
+  border-radius: 6px !important;
+  color: #334155 !important;
+  background: #f1f5f9 !important;
+  cursor: pointer !important;
+}
+#checkout-guard-overlay #cg-manual { margin: 12px 0 !important; }
+#checkout-guard-overlay #cg-manual label { display: block !important; font-size: 14px !important; }
+#checkout-guard-overlay #cg-purchase-input {
+  display: block !important;
+  box-sizing: border-box !important;
+  width: 100% !important;
+  margin: 6px 0 !important;
+  padding: 8px !important;
+  border: 1px solid #758ba8 !important;
+  border-radius: 6px !important;
+  font: 16px system-ui, sans-serif !important;
+  background: white !important;
+  color: #15263d !important;
+}
+#checkout-guard-overlay #cg-amount-note,
+#checkout-guard-overlay .cg-footnote {
+  margin: 10px 0 0 !important;
+  font: 12px/1.5 system-ui, sans-serif !important;
+  color: #475569 !important;
+}
+#checkout-guard-overlay #cg-budget-status {
+  margin: 8px 0 0 !important;
+  font: 13px/1.5 system-ui, sans-serif !important;
+  color: #334155 !important;
+}
+#checkout-guard-overlay .cg-visually-hidden {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  overflow: hidden !important;
+  clip-path: inset(50%) !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  #checkout-guard-modal { animation: none !important; }
+  #checkout-guard-overlay * { transition: none !important; }
+}
+@media (max-width: 480px) {
+  #checkout-guard-modal { padding: 28px 16px 20px !important; }
+  #checkout-guard-overlay .cg-impact-row { gap: 12px !important; }
 }
 
 @keyframes cgFadeIn {
@@ -41,7 +105,7 @@
   }
 }
 
-.cg-badge {
+#checkout-guard-overlay .cg-badge {
   display: inline-flex !important;
   align-items: center !important;
   gap: 6px !important;
@@ -49,12 +113,12 @@
   border-radius: 9999px !important;
   font-size: 13px !important;
   font-weight: 600 !important;
-  background-color: #fee2e2 !important;
-  color: #991b1b !important;
+  background-color: #e5efff !important;
+  color: #17479a !important;
   margin-bottom: 16px !important;
 }
 
-.cg-title {
+#checkout-guard-overlay .cg-title {
   font-size: 24px !important;
   font-weight: 700 !important;
   color: #0f172a !important;
@@ -62,14 +126,14 @@
   line-height: 1.25 !important;
 }
 
-.cg-subtitle {
+#checkout-guard-overlay .cg-subtitle {
   font-size: 15px !important;
   color: #475569 !important;
   margin: 0 0 24px 0 !important;
   line-height: 1.5 !important;
 }
 
-.cg-impact-card {
+#checkout-guard-overlay .cg-impact-card {
   background: #f8fafc !important;
   border: 1px solid #e2e8f0 !important;
   border-radius: 12px !important;
@@ -78,7 +142,7 @@
   text-align: left !important;
 }
 
-.cg-impact-row {
+#checkout-guard-overlay .cg-impact-row {
   display: flex !important;
   justify-content: space-between !important;
   font-size: 14px !important;
@@ -86,12 +150,12 @@
   color: #334155 !important;
 }
 
-.cg-impact-row strong {
+#checkout-guard-overlay .cg-impact-row strong {
   font-weight: 600 !important;
   color: #0f172a !important;
 }
 
-.cg-gauge-bar {
+#checkout-guard-overlay .cg-gauge-bar {
   width: 100% !important;
   height: 8px !important;
   background: #e2e8f0 !important;
@@ -100,22 +164,22 @@
   margin-top: 10px !important;
 }
 
-.cg-gauge-fill {
+#checkout-guard-overlay .cg-gauge-fill {
   height: 100% !important;
   background: #15803d !important;
   border-radius: 9999px !important;
   transition: width 0.4s ease !important;
 }
 
-.cg-gauge-fill.warning {
+#checkout-guard-overlay .cg-gauge-fill.warning {
   background: #f59e0b !important;
 }
 
-.cg-gauge-fill.danger {
+#checkout-guard-overlay .cg-gauge-fill.danger {
   background: #ef4444 !important;
 }
 
-.cg-timer-box {
+#checkout-guard-overlay .cg-timer-box {
   background: #eff6ff !important;
   border: 1px solid #bfdbfe !important;
   border-radius: 12px !important;
@@ -130,18 +194,18 @@
   gap: 8px !important;
 }
 
-.cg-timer-seconds {
+#checkout-guard-overlay .cg-timer-seconds {
   font-variant-numeric: tabular-nums !important;
   font-size: 18px !important;
 }
 
-.cg-actions {
+#checkout-guard-overlay .cg-actions {
   display: flex !important;
   flex-direction: column !important;
   gap: 10px !important;
 }
 
-.cg-btn-step-away {
+#checkout-guard-overlay .cg-btn-step-away {
   background: #0f172a !important;
   color: #ffffff !important;
   border: none !important;
@@ -154,11 +218,11 @@
   width: 100% !important;
 }
 
-.cg-btn-step-away:hover {
+#checkout-guard-overlay .cg-btn-step-away:hover {
   background: #1e293b !important;
 }
 
-.cg-btn-proceed {
+#checkout-guard-overlay .cg-btn-proceed {
   background: #f1f5f9 !important;
   color: #94a3b8 !important;
   border: 1px solid #cbd5e1 !important;
@@ -171,14 +235,14 @@
   width: 100% !important;
 }
 
-.cg-btn-proceed.unlocked {
+#checkout-guard-overlay .cg-btn-proceed.unlocked {
   background: #ffffff !important;
   color: #475569 !important;
   cursor: pointer !important;
   border-color: #94a3b8 !important;
 }
 
-.cg-btn-proceed.unlocked:hover {
+#checkout-guard-overlay .cg-btn-proceed.unlocked:hover {
   background: #f8fafc !important;
   color: #0f172a !important;
 }

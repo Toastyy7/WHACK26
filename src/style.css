@@ -136,6 +136,15 @@ select {
   padding: 8px;
   margin-top: 4px;
 }
+input[type='range'] {
+  accent-color: var(--blue);
+  padding: 0;
+  border: none;
+  height: 26px;
+}
+.target-control { margin-top: 14px; font-size: .9rem; }
+.hint { font-size: .82rem; color: #425675; line-height: 1.5; }
+[aria-invalid='true'] { border-color: #b91c1c !important; }
 input[type='checkbox'] {
   width: 20px;
   height: 20px;
