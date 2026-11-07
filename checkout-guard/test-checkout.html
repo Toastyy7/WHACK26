@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Apex Retail · Checkout & Payment</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    body {
+      background-color: #f1f5f9;
+      color: #1e293b;
+      padding: 40px 20px;
+    }
+    .checkout-container {
+      max-width: 840px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 1.5fr 1fr;
+      gap: 30px;
+    }
+    .panel {
+      background: #ffffff;
+      padding: 24px;
+      border-radius: 12px;
+      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.07);
+    }
+    h1 {
+      font-size: 22px;
+      margin-bottom: 20px;
+      color: #0f172a;
+    }
+    h2 {
+      font-size: 16px;
+      margin-bottom: 14px;
+      color: #334155;
+    }
+    .form-group {
+      margin-bottom: 14px;
+    }
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: 500;
+      color: #475569;
+      margin-bottom: 4px;
+    }
+    input {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      font-size: 14px;
+    }
+    .form-row {
+      display: flex;
+      gap: 12px;
+    }
+    .cart-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 12px 0;
+      border-bottom: 1px solid #f1f5f9;
+      font-size: 14px;
+    }
+    .cart-total-row {
+      display: flex;
+      justify-content: space-between;
+      padding-top: 16px;
+      margin-top: 8px;
+      font-size: 18px;
+      font-weight: 700;
+      color: #0f172a;
+    }
+    .btn-checkout {
+      display: block;
+      width: 100%;
+      background: #2563eb;
+      color: white;
+      border: none;
+      padding: 14px;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 20px;
+    }
+    .btn-checkout:hover {
+      background: #1d4ed8;
+    }
+    .badge-test {
+      display: inline-block;
+      background: #e0f2fe;
+      color: #0369a1;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      margin-bottom: 16px;
+    }
+  </style>
+</head>
+<body>
+  <div class="checkout-container">
+    <!-- Left column: Payment and Shipping form -->
+    <div class="panel">
+      <span class="badge-test">Offline Test Environment</span>
+      <h1>Checkout & Shipping Details</h1>
+      
+      <h2>1. Shipping Address</h2>
+      <div class="form-group">
+        <label for="name">Full Name</label>
+        <input type="text" id="name" autocomplete="shipping name" value="Alex Smith">
+      </div>
+      <div class="form-group">
+        <label for="address">Delivery Address</label>
+        <input type="text" id="address" autocomplete="shipping street-address" value="42 High Street">
+      </div>
+
+      <h2 style="margin-top: 24px;">2. Payment Information</h2>
+      <div class="form-group">
+        <label for="cardNumber">Card Number</label>
+        <input type="text" id="cardNumber" autocomplete="cc-number" placeholder="4000 1234 5678 9010" value="4000 •••• •••• 9010">
+      </div>
+      <div class="form-row">
+        <div class="form-group" style="flex: 1;">
+          <label for="exp">Expiry (MM/YY)</label>
+          <input type="text" id="exp" autocomplete="cc-exp" placeholder="12/28" value="12/28">
+        </div>
+        <div class="form-group" style="flex: 1;">
+          <label for="cvv">Security Code (CVV)</label>
+          <input type="text" id="cvv" autocomplete="cc-csc" placeholder="123" value="•••">
+        </div>
+      </div>
+    </div>
+
+    <!-- Right column: Order Summary -->
+    <div class="panel">
+      <h1>Order Summary</h1>
+      
+      <div class="cart-item">
+        <span>Wireless ANC Headphones</span>
+        <strong>£65.00</strong>
+      </div>
+      <div class="cart-item">
+        <span>Standard Tracked Delivery</span>
+        <strong>£4.99</strong>
+      </div>
+
+      <div class="form-group" style="margin-top: 16px;">
+        <label for="coupon">Promo or Gift Code</label>
+        <input type="text" id="coupon" name="coupon" placeholder="Enter coupon">
+      </div>
+
+      <div class="cart-total-row">
+        <span>Estimated Total:</span>
+        <span id="order-total" class="order-total" data-checkout-total="69.99">£69.99</span>
+      </div>
+
+      <button type="submit" class="btn-checkout" id="submitOrderBtn">
+        Complete Purchase (£69.99)
+      </button>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,184 @@
+/* CheckoutGuard Friction Modal Styles */
+#checkout-guard-overlay {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  background: rgba(15, 23, 42, 0.8) !important;
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+  z-index: 2147483647 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+  color: #0f172a !important;
+  padding: 20px !important;
+  box-sizing: border-box !important;
+}
+
+#checkout-guard-modal {
+  background: #ffffff !important;
+  border-radius: 18px !important;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35) !important;
+  max-width: 480px !important;
+  width: 100% !important;
+  padding: 32px 28px !important;
+  text-align: center !important;
+  animation: cgFadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  box-sizing: border-box !important;
+  border: 1px solid #e2e8f0 !important;
+}
+
+@keyframes cgFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.cg-badge {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  padding: 6px 14px !important;
+  border-radius: 9999px !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  background-color: #fee2e2 !important;
+  color: #991b1b !important;
+  margin-bottom: 16px !important;
+}
+
+.cg-title {
+  font-size: 24px !important;
+  font-weight: 700 !important;
+  color: #0f172a !important;
+  margin: 0 0 10px 0 !important;
+  line-height: 1.25 !important;
+}
+
+.cg-subtitle {
+  font-size: 15px !important;
+  color: #475569 !important;
+  margin: 0 0 24px 0 !important;
+  line-height: 1.5 !important;
+}
+
+.cg-impact-card {
+  background: #f8fafc !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 12px !important;
+  padding: 16px !important;
+  margin-bottom: 24px !important;
+  text-align: left !important;
+}
+
+.cg-impact-row {
+  display: flex !important;
+  justify-content: space-between !important;
+  font-size: 14px !important;
+  margin-bottom: 8px !important;
+  color: #334155 !important;
+}
+
+.cg-impact-row strong {
+  font-weight: 600 !important;
+  color: #0f172a !important;
+}
+
+.cg-gauge-bar {
+  width: 100% !important;
+  height: 8px !important;
+  background: #e2e8f0 !important;
+  border-radius: 9999px !important;
+  overflow: hidden !important;
+  margin-top: 10px !important;
+}
+
+.cg-gauge-fill {
+  height: 100% !important;
+  background: #2563eb !important;
+  border-radius: 9999px !important;
+  transition: width 0.4s ease !important;
+}
+
+.cg-gauge-fill.warning {
+  background: #f59e0b !important;
+}
+
+.cg-gauge-fill.danger {
+  background: #ef4444 !important;
+}
+
+.cg-timer-box {
+  background: #eff6ff !important;
+  border: 1px solid #bfdbfe !important;
+  border-radius: 12px !important;
+  padding: 14px !important;
+  margin-bottom: 24px !important;
+  font-size: 15px !important;
+  font-weight: 600 !important;
+  color: #1d4ed8 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+}
+
+.cg-timer-seconds {
+  font-variant-numeric: tabular-nums !important;
+  font-size: 18px !important;
+}
+
+.cg-actions {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 10px !important;
+}
+
+.cg-btn-step-away {
+  background: #0f172a !important;
+  color: #ffffff !important;
+  border: none !important;
+  padding: 14px 20px !important;
+  font-size: 15px !important;
+  font-weight: 600 !important;
+  border-radius: 10px !important;
+  cursor: pointer !important;
+  transition: background-color 0.15s ease !important;
+  width: 100% !important;
+}
+
+.cg-btn-step-away:hover {
+  background: #1e293b !important;
+}
+
+.cg-btn-proceed {
+  background: #f1f5f9 !important;
+  color: #94a3b8 !important;
+  border: 1px solid #cbd5e1 !important;
+  padding: 12px 20px !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  border-radius: 10px !important;
+  cursor: not-allowed !important;
+  transition: all 0.2s ease !important;
+  width: 100% !important;
+}
+
+.cg-btn-proceed.unlocked {
+  background: #ffffff !important;
+  color: #475569 !important;
+  cursor: pointer !important;
+  border-color: #94a3b8 !important;
+}
+
+.cg-btn-proceed.unlocked:hover {
+  background: #f8fafc !important;
+  color: #0f172a !important;
+}

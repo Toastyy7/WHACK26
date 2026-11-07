@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>CheckoutGuard Settings</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+    body {
+      width: 320px;
+      padding: 16px;
+      background-color: #f8fafc;
+      color: #0f172a;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .brand-icon {
+      font-size: 20px;
+    }
+    .brand-name {
+      font-size: 16px;
+      font-weight: 700;
+      color: #0f172a;
+    }
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 38px;
+      height: 22px;
+    }
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      inset: 0;
+      background-color: #cbd5e1;
+      transition: .3s;
+      border-radius: 22px;
+    }
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 16px;
+      width: 16px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: .3s;
+      border-radius: 50%;
+    }
+    input:checked + .slider {
+      background-color: #2563eb;
+    }
+    input:checked + .slider:before {
+      transform: translateX(16px);
+    }
+    .card {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 14px;
+      margin-bottom: 14px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    .budget-summary {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      font-size: 13px;
+      color: #64748b;
+    }
+    .remaining-val {
+      font-size: 22px;
+      font-weight: 700;
+      color: #0f172a;
+      margin-bottom: 8px;
+    }
+    .progress-bar {
+      height: 6px;
+      background: #e2e8f0;
+      border-radius: 4px;
+      overflow: hidden;
+      margin-bottom: 6px;
+    }
+    .progress-fill {
+      height: 100%;
+      background: #2563eb;
+      width: 40%;
+      transition: width 0.3s ease;
+    }
+    .form-group {
+      margin-bottom: 12px;
+    }
+    label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: #475569;
+      margin-bottom: 4px;
+    }
+    input[type="number"], select {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      font-size: 14px;
+      color: #0f172a;
+      outline: none;
+    }
+    input[type="number"]:focus, select:focus {
+      border-color: #2563eb;
+    }
+    .btn-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 14px;
+    }
+    button {
+      flex: 1;
+      padding: 9px 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: background 0.15s ease;
+    }
+    .btn-primary {
+      background: #2563eb;
+      color: white;
+    }
+    .btn-primary:hover {
+      background: #1d4ed8;
+    }
+    .btn-secondary {
+      background: #e2e8f0;
+      color: #475569;
+    }
+    .btn-secondary:hover {
+      background: #cbd5e1;
+    }
+    .toast {
+      display: none;
+      font-size: 12px;
+      text-align: center;
+      margin-top: 10px;
+      color: #166534;
+      background: #dcfce7;
+      padding: 6px;
+      border-radius: 6px;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="brand">
+      <span class="brand-icon">🛡️</span>
+      <span class="brand-name">CheckoutGuard</span>
+    </div>
+    <label class="switch" title="Toggle Guard Active State">
+      <input type="checkbox" id="guardToggle" checked>
+      <span class="slider"></span>
+    </label>
+  </div>
+
+  <div class="card">
+    <div class="budget-summary">
+      <span>Remaining Allowance</span>
+      <span id="percentDisplay">40% used</span>
+    </div>
+    <div id="remainingAmount" class="remaining-val">£180.00</div>
+    <div class="progress-bar">
+      <div id="budgetProgress" class="progress-fill"></div>
+    </div>
+  </div>
+
+  <div class="form-group">
+    <label for="monthlyBudget">Monthly Budget (£)</label>
+    <input type="number" id="monthlyBudget" min="10" step="5" value="300">
+  </div>
+
+  <div class="form-group">
+    <label for="currentSpent">Current Month Spend (£)</label>
+    <input type="number" id="currentSpent" min="0" step="5" value="120">
+  </div>
+
+  <div class="form-group">
+    <label for="cooldownSeconds">Reflection Cooldown</label>
+    <select id="cooldownSeconds">
+      <option value="10">10 Seconds (Quick Demo)</option>
+      <option value="15" selected>15 Seconds</option>
+      <option value="30">30 Seconds</option>
+      <option value="60">60 Seconds (Full Pause)</option>
+    </select>
+  </div>
+
+  <div class="btn-row">
+    <button id="saveBtn" class="btn-primary">Save Changes</button>
+    <button id="resetBtn" class="btn-secondary">Reset Demo</button>
+  </div>
+
+  <div id="statusToast" class="toast">Settings saved successfully!</div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
