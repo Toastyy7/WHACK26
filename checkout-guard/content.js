@@ -113,8 +113,11 @@
   }
 
   /**
-   * 1. Detect if the user is currently on an e-commerce checkout or high-intent cart page.
-   * Features fast-path bailing, zero forced reflows, and Amazon guards.
+   * 1. Detect if the user is currently on an e-commerce cart or checkout page.
+   * Universal multi-platform architecture:
+   * - Phase A: Cart / Basket stage (/cart, /basket, /bag, order summaries, 'Proceed to Checkout')
+   * - Phase B: Checkout / Payment stage (/checkout, payment forms, credit card inputs, 'Place Order')
+   * Works consistently across Shopify, WooCommerce, Magento, BigCommerce, Stripe, Amazon, ASOS, Nike, etc.
    * @returns {{ isCheckout: boolean, score: number, signals: string[] }}
    */
   function detectCheckout() {
@@ -126,12 +129,15 @@
     const pathname = window.location.pathname.toLowerCase();
 
     // =========================================================================
-    // FAST-PATH OPTIMIZATION (0ms Exit on normal browsing):
-    // If the URL has no shopping/checkout keywords AND no payment iframe exists,
+    // FAST-PATH OPTIMIZATION (0ms Exit on normal non-shopping browsing):
+    // If the URL has no shopping/cart/checkout keywords AND no payment iframe exists,
     // exit immediately to prevent running any DOM scans.
     // =========================================================================
-    const hasCheckoutKeyword = /checkout|cart|basket|order|pay|billing|purchase|buy|spc|test-checkout/i.test(pathname);
-    const hasPaymentIframe = !!document.querySelector('iframe[src*="stripe.com"], iframe[src*="paypal.com"]');
+    const hasCheckoutKeyword = /checkout|cart|basket|bag|panier|warenkorb|order|pay|billing|purchase|buy|spc|test-checkout/i.test(pathname) ||
+      /checkout|cart/i.test(hostname);
+    const hasPaymentIframe = !!document.querySelector(
+      'iframe[src*="stripe.com"], iframe[src*="paypal.com"], iframe[src*="klarna.com"], iframe[src*="adyen.com"]'
+    );
 
     if (!hasCheckoutKeyword && !hasPaymentIframe && !hostname.includes("amazon.")) {
       return { isCheckout: false, score: 0, signals: ["FAST_PATH_SKIPPED"] };
@@ -185,31 +191,61 @@
     }
 
     // =========================================================================
-    // GENERAL E-COMMERCE DETECTION (Zero Lag & Strict Scoring)
+    // UNIVERSAL E-COMMERCE DETECTION (Zero Lag & Comprehensive Coverage)
     // =========================================================================
     let score = 0;
     const signals = [];
     const activeCategories = new Set();
 
-    // Fast-targeted button query: only scan buttons likely to submit an order or checkout
+    // Query candidate buttons and links that trigger checkout or order actions
     const candidateButtons = Array.from(
       document.querySelectorAll(
         "form button, form input[type='submit'], button[type='submit'], " +
-        "[id*='checkout' i], [id*='order' i], [id*='pay' i], [class*='checkout' i], [class*='order' i]"
+        "a[href*='checkout' i], a[href*='cart' i], a.btn-checkout, " +
+        "[id*='checkout' i], [id*='order' i], [id*='pay' i], [id*='basket' i], " +
+        "[class*='checkout' i], [class*='order' i], [class*='basket' i], " +
+        "[role='button'][class*='checkout' i], [role='button'][id*='checkout' i]"
       )
     ).filter(isElementVisible);
 
-    // Guardrail: Product detail pages with "Add to Cart" or "Add to Bag"
-    const hasAddToCart = candidateButtons.some((btn) => {
+    // 1. Check for Cart Navigation Actions (e.g., 'Proceed to Checkout', 'Go to Checkout')
+    const proceedToCheckoutBtn = candidateButtons.find((btn) => {
       const text = (btn.textContent || btn.value || "").trim().toLowerCase();
-      return /^(add to (cart|bag|basket)|pre-order now)/i.test(text);
+      return /^(proceed to checkout|go to checkout|secure checkout|checkout now|continue to checkout|view bag|view basket|view cart|proceed to purchase)/i.test(text);
     });
+    if (proceedToCheckoutBtn) {
+      score += 5;
+      signals.push("PROCEED_TO_CHECKOUT_BTN");
+      activeCategories.add("CHECKOUT_INTENT");
+    }
 
-    // Guardrail: Active catalog search input
-    const searchInput = document.querySelector('input[type="search"], input[name="q"], input[name="search"]');
-    const hasSearchInput = searchInput ? isElementVisible(searchInput) : false;
+    // 2. Check for Final Order Actions (e.g., 'Place Order', 'Complete Purchase', 'Pay Now')
+    const finalOrderBtn = candidateButtons.find((btn) => {
+      const text = (btn.textContent || btn.value || "").trim().toLowerCase();
+      return /^(place order|complete purchase|pay now|submit order|pay with card|confirm (and|&) pay|authorize payment|complete order)/i.test(text);
+    });
+    if (finalOrderBtn) {
+      score += 6;
+      signals.push("FINAL_ORDER_BTN");
+      activeCategories.add("FINAL_ACTION");
+    }
 
-    // Category 1: Explicit E-Commerce Checkout Form Containers (+5 pts)
+    // 3. URL Classification: Cart vs. Checkout Funnel
+    const isCartUrl = /(?:^|\/)(cart|basket|bag|shopping[-_]?cart|my[-_]?cart|panier|warenkorb)(?:[\/?#]|$)/i.test(pathname);
+    const isCheckoutUrl = /(?:^|\/)(checkout|checkouts|order[_-]?summary|review[_-]?order|payment[_-]?step|pay[_-]?now|billing|test-checkout)(?:[\/?#]|$)/i.test(pathname) ||
+      hostname.startsWith("checkout.") || pathname.includes("/checkouts/");
+
+    if (isCheckoutUrl) {
+      score += 5;
+      signals.push("URL_CHECKOUT");
+      activeCategories.add("URL");
+    } else if (isCartUrl) {
+      score += 4;
+      signals.push("URL_CART");
+      activeCategories.add("URL");
+    }
+
+    // 4. Form Containers (Shopify, WooCommerce, Magento, BigCommerce, Stripe)
     const checkoutContainers = [
       'form.woocommerce-checkout',
       'form#checkout-form',
@@ -219,69 +255,71 @@
       '#checkout-step-payment',
       '.opc-wrapper-opc',
       '#payment-form',
-      '.checkout-container'
+      '.checkout-container',
+      '#orderSummary',
+      '.cart-totals',
+      '.cart-subtotal'
     ];
     if (document.querySelector(checkoutContainers.join(", "))) {
-      score += 5;
+      score += 4;
       signals.push("CHECKOUT_CONTAINER");
       activeCategories.add("CONTAINER");
     }
 
-    // Category 2: URL Path (+4 pts)
-    if (/(?:^|\/)(checkout|checkouts|order[_-]?summary|review[_-]?order|payment[_-]?step|pay[_-]?now|test-checkout)(?:[\/?#]|$)/i.test(pathname)) {
-      score += 4;
-      signals.push("URL_CHECKOUT_PATH");
-      activeCategories.add("URL");
-    }
-
-    // Category 3: Payment / Card Fields (+5 pts)
+    // 5. Payment Fields & Hosted Gateways (Credit Card, Stripe, PayPal, Klarna)
     const paymentFields = document.querySelectorAll(
-      'input[autocomplete="cc-number"], input[id="cardNumber" i], input[name="cardNumber" i], input[id="cvv" i], input[autocomplete="cc-csc"], .StripeElement'
+      'input[autocomplete="cc-number"], input[id*="cardNumber" i], input[name*="cardNumber" i], ' +
+      'input[id="cvv" i], input[name="cvv" i], input[autocomplete="cc-csc"], .StripeElement'
     );
     const visiblePaymentFields = Array.from(paymentFields).filter(isElementVisible);
-    if (visiblePaymentFields.length > 0) {
+    if (visiblePaymentFields.length > 0 || hasPaymentIframe) {
       score += 5;
       signals.push("PAYMENT_FIELDS");
       activeCategories.add("PAYMENT");
     }
 
-    // Category 4: High-Intent Action Buttons (+5 pts)
-    const finalBtn = candidateButtons.find((btn) => {
-      const text = (btn.textContent || btn.value || "").trim().toLowerCase();
-      return /^(place order|complete purchase|pay now|submit order|pay with card|confirm (and|&) pay|authorize payment)/i.test(text);
-    });
-    if (finalBtn) {
-      score += 5;
-      signals.push("FINAL_ACTION_BUTTON");
-      activeCategories.add("ACTION_BUTTON");
-    }
-
-    // Category 5: Order Total Summary (+2 pts)
-    const hasOrderTotal = document.querySelector('[data-checkout-total], #order-total, .order-total, .cart-total-row');
-    if (hasOrderTotal && isElementVisible(hasOrderTotal)) {
-      score += 2;
+    // 6. Order Total Element
+    const totalEl = document.querySelector(
+      '[data-checkout-total], #order-total, .order-total, .cart-total, .checkout-total, ' +
+      '.cart-total-row, .cart-subtotal, .order-subtotal, [class*="summary-total" i], [data-test="total-amount"]'
+    );
+    const hasOrderTotal = totalEl ? isElementVisible(totalEl) : false;
+    if (hasOrderTotal) {
+      score += 3;
       signals.push("ORDER_TOTAL");
       activeCategories.add("SUMMARY");
     }
 
-    // Disqualification: Browsing page indicators
-    if (hasAddToCart && visiblePaymentFields.length === 0 && !finalBtn) {
+    // =========================================================================
+    // GUARDRAIL: Product Detail Pages (PDP) with 'Add to Cart'
+    // Only treat as a product page if 'Add to Cart' is present AND there are no
+    // cart totals, checkout proceed links, or payment credentials.
+    // =========================================================================
+    const hasAddToCart = candidateButtons.some((btn) => {
+      const text = (btn.textContent || btn.value || "").trim().toLowerCase();
+      return /^(add to (cart|bag|basket)|pre-order now)/i.test(text);
+    });
+
+    if (hasAddToCart && !hasOrderTotal && !proceedToCheckoutBtn && !finalOrderBtn && visiblePaymentFields.length === 0) {
       return {
         isCheckout: false,
         score,
         signals: [...signals, "DISQUALIFIED_PRODUCT_PAGE"],
       };
     }
-    if (hasSearchInput && activeCategories.size < 2) {
-      return {
-        isCheckout: false,
-        score,
-        signals: [...signals, "DISQUALIFIED_CATALOG_BROWSING"],
-      };
-    }
 
-    // High Threshold: score >= 10 AND at least 2 distinct categories
-    const isCheckout = score >= 10 && activeCategories.size >= 2;
+    // =========================================================================
+    // BALANCED DECISION CRITERIA:
+    // Triggers when EITHER:
+    // 1. User is on Cart/Bag with a checkout intent or cart total (score >= 7)
+    // 2. User is in the Checkout funnel with form/card/button (score >= 8 or 2+ categories)
+    // =========================================================================
+    const isCartConfirmed = isCartUrl && (proceedToCheckoutBtn || hasOrderTotal);
+    const isCheckoutConfirmed = (isCheckoutUrl && (finalOrderBtn || visiblePaymentFields.length > 0 || hasOrderTotal || activeCategories.has("CONTAINER"))) ||
+      (finalOrderBtn && (visiblePaymentFields.length > 0 || hasOrderTotal)) ||
+      score >= 8;
+
+    const isCheckout = isCartConfirmed || isCheckoutConfirmed;
 
     return {
       isCheckout,
@@ -307,19 +345,28 @@
       title = titleEl.textContent.trim().slice(0, 45);
     }
 
-    // Price selectors
+    // Universal price selectors (Shopify, WooCommerce, Amazon, ASOS, Nike, eBay, Argos, etc.)
     const totalSelectors = [
       '[data-checkout-total]',
+      '[data-checkout-payment-due-target]',
       '#order-total',
       '.order-total',
       '.cart-total',
       '.checkout-total',
       '[data-test="total-amount"]',
+      '[data-test="total-value"]',
+      '[data-testid="bag-total-value"]',
+      '[data-test="basket-total"]',
+      '[data-test-id="TOTAL"]',
       '#subtotals-marketplace-table .grand-total-price',
       '.spc-order-summary .a-color-price',
       '#sc-subtotal-amount-activecart .sc-price',
       'td.grand-total-price',
-      '.cart-total-row span:last-child'
+      '.cart-total-row span:last-child',
+      '.total-line__price',
+      '.cart_totals .amount',
+      '.order-total .amount',
+      '.cart-subtotal .amount'
     ];
 
     for (const selector of totalSelectors) {
