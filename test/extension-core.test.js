@@ -99,3 +99,49 @@ test('settings subscription filters unrelated changes and can unsubscribe', () =
   unsubscribe();
   assert.equal(listener, null);
 });
+
+function memoryGuard(values = {}) {
+  const local = {
+    get: async (keys) => {
+      if (keys === null) return { ...values };
+      if (typeof keys === 'string') return keys in values ? { [keys]: values[keys] } : {};
+      return { ...keys, ...values };
+    },
+    set: async (data) => { Object.assign(values, data); },
+    remove: async (key) => { delete values[key]; },
+  };
+  return { guard: core({ browser: { storage: { local } } }), values };
+}
+
+test('continuing a checkout adds the purchase to this month\'s spend straight away', async () => {
+  const { guard } = memoryGuard({ monthlyBudget: 300, currentSpent: 120 });
+  await guard.recordSpend(6999);
+  const settings = await guard.load();
+  assert.equal(settings.currentSpent, 189.99);
+  assert.equal(settings.monthlyBudget, 300);
+  await assert.rejects(guard.recordSpend(0));
+});
+
+test('the dashboard snapshot replaces the extension budget and spend with one shared number', async () => {
+  const { guard, values } = memoryGuard({ monthlyBudget: 300, currentSpent: 120, cooldownSeconds: 20 });
+  await guard.applySnapshot({ monthlyBudget: 45000, currentSpent: 5000 });
+  const settings = await guard.load();
+  assert.equal(settings.monthlyBudget, 450);
+  assert.equal(settings.currentSpent, 50);
+  assert.equal(settings.cooldownSeconds, 20);
+  for (const bad of [null, { monthlyBudget: 0, currentSpent: 0 }, { monthlyBudget: 100, currentSpent: -1 },
+    { monthlyBudget: 1.5, currentSpent: 0 }, { monthlyBudget: '100', currentSpent: 0 }]) {
+    await assert.rejects(guard.applySnapshot(bad));
+  }
+  assert.equal(values.currentSpent, 50);
+});
+
+test('a shop stays approved for 30 minutes so multi-page checkouts do not pause every step', async () => {
+  const { guard } = memoryGuard();
+  const now = 1_000_000;
+  assert.equal(await guard.isApproved('shop.example', now), false);
+  await guard.approve('shop.example', now);
+  assert.equal(await guard.isApproved('shop.example', now + 29 * 60 * 1000), true);
+  assert.equal(await guard.isApproved('other.example', now), false);
+  assert.equal(await guard.isApproved('shop.example', now + 31 * 60 * 1000), false);
+});

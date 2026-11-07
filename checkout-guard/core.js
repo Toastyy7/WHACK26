@@ -154,7 +154,39 @@
     return () => event.removeListener(handle);
   }
 
+  // Settings store pounds; keep maths in integer pence and convert once.
+  async function updateSettings(change) {
+    const current = normalise(await storage('get', defaults));
+    await storage('set', normalise({ ...current, ...change }));
+  }
+
+  async function recordSpend(amount) {
+    if (!Number.isSafeInteger(amount) || amount <= 0) throw new Error('Invalid purchase amount.');
+    const current = normalise(await storage('get', defaults));
+    await updateSettings({ currentSpent: ((pence(current.currentSpent) + amount) / 100).toFixed(2) });
+  }
+
+  // The open dashboard is the source of truth: its target becomes the budget and
+  // this month's dashboard spending becomes the extension's spend.
+  async function applySnapshot(snapshot) {
+    const { monthlyBudget, currentSpent } = snapshot ?? {};
+    if (!Number.isSafeInteger(monthlyBudget) || monthlyBudget <= 0 ||
+        !Number.isSafeInteger(currentSpent) || currentSpent < 0) throw new Error('Invalid dashboard snapshot.');
+    await updateSettings({ monthlyBudget: (monthlyBudget / 100).toFixed(2), currentSpent: (currentSpent / 100).toFixed(2) });
+  }
+
+  // Once someone continues past (or closes) the pause, later steps of the same
+  // shop's checkout must not pause again or record the order twice.
+  const approvalPrefix = 'checkoutGuard.approved.';
+  const approvalMs = 30 * 60 * 1000;
+  const approve = (host, now = Date.now()) => storage('set', { [approvalPrefix + host]: now + approvalMs });
+  async function isApproved(host, now = Date.now()) {
+    const until = (await storage('get', approvalPrefix + host))?.[approvalPrefix + host];
+    return Number.isSafeInteger(until) && until > now;
+  }
+
   globalThis.CheckoutGuard = Object.freeze({
+    recordSpend, applySnapshot, approve, isApproved,
     queuePurchase, pendingPurchases, subscribePurchases, validPurchase,
     acknowledgePurchase: (id) => storage('remove', purchasePrefix + id),
     queueCoolingItem, pendingCoolingItems, subscribeCoolingItems, validCoolingItem,

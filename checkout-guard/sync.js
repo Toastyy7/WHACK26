@@ -27,7 +27,11 @@
 
   window.addEventListener('message', async (event) => {
     if (event.source !== window || event.origin !== location.origin || event.data?.source !== 'credit-guard-dashboard') return;
-    if (event.data.type === 'ready') {
+    if (event.data.type === 'snapshot') {
+      try {
+        await guard.applySnapshot({ monthlyBudget: event.data.monthlyBudget, currentSpent: event.data.currentSpent });
+      } catch (error) { console.warn('[CheckoutGuard] Dashboard numbers not applied:', error.message); }
+    } else if (event.data.type === 'ready') {
       ready = true;
       await deliver();
     } else if (event.data.type === 'purchase-saved' && offeredPurchases.has(event.data.id)) {

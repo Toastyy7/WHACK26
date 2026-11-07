@@ -8,6 +8,8 @@
   if (!guard?.available()) return;
   let settings;
   let dismissedCheckout = null;
+  // shortcut: read once per page load, so an approval expiring while the page stays open is ignored.
+  let approved = false;
   let active = null;
   let refreshTimer = null;
   let loadVersion = 0;
@@ -310,6 +312,7 @@
     let manualAmount = null;
     let lastRender = '';
     let savingPurchase = false;
+    let spendRecorded = false;
     const purchaseId = crypto.randomUUID();
     const amountInput = find('#cg-purchase-input');
     find('#cg-manual').hidden = total !== null;
@@ -344,8 +347,12 @@
       }
     }
 
-    function close(dismiss = false) {
+    function close(dismiss = false, approveShop = false) {
       if (dismiss) dismissedCheckout = checkoutSignature;
+      if (approveShop) {
+        approved = true;
+        guard.approve(location.hostname).catch((error) => console.warn('[CheckoutGuard] Could not remember approval:', error.message));
+      }
       clearInterval(interval);
       document.removeEventListener('keydown', onKey, true);
       document.removeEventListener('focusin', onFocus, true);
@@ -361,7 +368,7 @@
       if (event.key === 'Escape') {
         event.preventDefault();
         event.stopPropagation();
-        close(true);
+        close(true, true);
       } else if (event.key === 'Tab') {
         const items = focusable();
         const first = items[0];
@@ -393,7 +400,7 @@
       amountInput.setAttribute('aria-invalid', String(amountInput.value !== '' && manualAmount === null));
       render();
     });
-    find('#cg-close').addEventListener('click', () => close(true));
+    find('#cg-close').addEventListener('click', () => close(true, true));
     find('#cg-proceed').addEventListener('click', async () => {
       if (Date.now() < deadline || savingPurchase) return;
       const purchase = total ?? manualAmount;
@@ -409,9 +416,12 @@
       const now = new Date();
       const date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
       try {
+        // Spend first: the dashboard's reply snapshot then already includes this purchase.
+        if (!spendRecorded) await guard.recordSpend(purchase);
+        spendRecorded = true;
         await guard.queuePurchase({ version: 1, id: purchaseId, amount: purchase,
           currency: 'GBP', merchant: location.hostname, date });
-        if (overlay.isConnected) close(true);
+        if (overlay.isConnected) close(true, true);
       } catch (error) {
         find('#cg-budget-status').textContent = `Could not save the checkout: ${error.message} Try again.`;
         button.disabled = false;
@@ -467,7 +477,7 @@
   function refresh() {
     if (!settings) return;
     if (settings.isEnabled && document.hidden && !active) return;
-    if (!settings.isEnabled || !detectCheckout().isCheckout) {
+    if (!settings.isEnabled || approved || !detectCheckout().isCheckout) {
       active?.close();
       dismissedCheckout = null;
       return;
@@ -491,9 +501,10 @@
   async function loadSettings() {
     const version = ++loadVersion;
     try {
-      const loaded = await guard.load();
+      const [loaded, shopApproved] = await Promise.all([guard.load(), guard.isApproved(location.hostname)]);
       if (version !== loadVersion) return;
       settings = loaded;
+      approved = approved || shopApproved;
       refresh();
     } catch (error) {
       // A failed storage read must not replace someone's saved budget with a guess.
