@@ -1,0 +1,38 @@
+name: Check Jamie branch
+
+on:
+  push:
+    branches: [jamieBranch]
+  pull_request:
+    branches: [jamieBranch]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: npm ci
+      - run: npm test
+      - run: npm run lint:extension
+      - run: npm run build
+      - run: pip install -r requirements-browser.txt
+      - run: python -m playwright install --with-deps chromium
+      - run: npm run test:browser
+      - run: npm run pack:extension
+      - uses: actions/upload-artifact@v4
+        with:
+          name: offline-demo-and-extension
+          path: |
+            dist/
+            web-ext-artifacts/

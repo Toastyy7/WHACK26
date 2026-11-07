@@ -11,10 +11,13 @@ export const createInitialAccount = () => ({
 
 // Parse typed pounds without floating-point arithmetic. Null means invalid input.
 export function parsePoundsToPence(value) {
-  // Accept up to seven whole-pound digits and optionally one or two decimal digits.
-  if (!/^\d{1,7}(\.\d{1,2})?$/.test(value)) return null;
+  if (typeof value !== 'string') return null;
+  // Tolerate surrounding spaces, '.50' and '12.' as people actually type them.
+  const text = value.trim().replace(/^\./, '0.');
+  // Accept up to seven whole-pound digits and optionally up to two decimal digits.
+  if (!/^\d{1,7}(\.\d{0,2})?$/.test(text)) return null;
   // For '12.5', padEnd turns the fraction '5' into '50': 1200 + 50 pence.
-  const [pounds, fraction = ''] = value.split('.');
+  const [pounds, fraction = ''] = text.split('.');
   return Number(pounds) * 100 + Number(fraction.padEnd(2, '0'));
 }
 
@@ -33,6 +36,7 @@ export function getGaugeState(balance, limit, target) {
     zone = 'amber';
     label = 'At or above your target';
   }
+  if (balance > limit) label = 'Credit limit exceeded';
 
   return {
     percentage,

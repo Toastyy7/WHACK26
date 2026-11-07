@@ -3,10 +3,17 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": "^20.19.0 || >=22.12.0"
+  },
   "scripts": {
+    "start": "vite --host 127.0.0.1",
     "dev": "vite --host 127.0.0.1",
     "build": "vite build",
     "test": "node --test",
+    "test:browser": "python3 scripts/check-browser.py",
+    "lint:extension": "web-ext lint --source-dir checkout-guard",
+    "pack:extension": "web-ext build --source-dir checkout-guard --overwrite-dest --ignore-files '*.md' test-checkout.html",
     "preview": "vite preview --host 127.0.0.1"
   },
   "dependencies": {
@@ -15,6 +22,7 @@
     "react-dom": "19.2.0"
   },
   "devDependencies": {
-    "vite": "7.2.2"
+    "vite": "7.3.7",
+    "web-ext": "10.8.0"
   }
 }

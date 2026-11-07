@@ -1,0 +1,17 @@
+node_modules/
+.next/
+.vite/
+.cache/
+.venv/
+__pycache__/
+*.pyc
+web-ext-artifacts/
+test-results/
+playwright-report/
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+
+# dist/ is deliberately committed for the offline demo.

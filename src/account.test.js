@@ -26,6 +26,10 @@ test('purchase preview is pure and handles the target and half-limit boundaries'
   // Accept valid pennies, but reject amounts with more than two decimal places.
   assert.equal(parsePoundsToPence('12.05'), 1205);
   assert.equal(parsePoundsToPence('12.005'), null);
+  assert.equal(parsePoundsToPence(' .50 '), 50);
+  assert.equal(parsePoundsToPence('12.'), 1200);
+  assert.equal(parsePoundsToPence(null), null);
+  assert.equal(getGaugeState(108000, state.limit, state.target).label, 'Credit limit exceeded');
 });
 
 // Check exact boundaries, including an over-limit balance and a custom target.
