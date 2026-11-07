@@ -14,7 +14,7 @@ Adaptive Credit Guard is a credit card dashboard. It shows what a purchase would
 | Feature | Customer experience | Demo boundaries |
 |---|---|---|
 | Safe-Zone Gauge | Show the balance in pounds, the share of the limit used and a plain-language label. A purchase preview updates the projected balance and tells the customer when they cross their selected target. | Use a sample 30% target. Display “Within your target” below 30%, “Above your target” from 30% to under 50%, and “Using at least half your limit” from 50%. These are interface bands. No credit-score prediction. |
-| Silent Grace | Tap “Ask for payment support”, preview and edit a short message, then confirm. Get a reference and follow updates in writing. | Send to a simulated lender inbox. Show “Request received · awaiting review”. Keep the due date and amount visible until the lender confirms an arrangement. |
+| Request Grace | Tap “Ask for payment support”, preview and edit a short message, then confirm. Get a reference and follow updates in writing. | Send to a simulated lender inbox. Show “Request received · awaiting review”. Keep the due date and amount visible until the lender confirms an arrangement. |
 
 ### Screen copy
 

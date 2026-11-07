@@ -27,12 +27,10 @@ function MoneyControl({ label, amount, minimum, onSave }) {
   );
 }
 
-// Presenter-only controls for the gauge and support request.
+// Presenter-only controls for the account amounts and gauge target.
 export default function DemoControls({
   account,
   updateAccount,
-  simulateSupportFailure,
-  setSupportFailure,
 }) {
   return (
     <details className="demo">
@@ -67,14 +65,6 @@ export default function DemoControls({
               else e.target.value = account.target;
             }}
           />
-        </label>
-        <label className="check">
-          <input
-            type="checkbox"
-            checked={simulateSupportFailure}
-            onChange={(e) => setSupportFailure(e.target.checked)}
-          />{' '}
-          Fail support submission
         </label>
       </div>
       <p>

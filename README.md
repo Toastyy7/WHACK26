@@ -26,8 +26,8 @@ The first install needs network access. Copy the source files into your team rep
 - `src/components/AccountOverview.jsx` — current balance and credit limit.
 - `src/components/SafeZoneGauge.jsx` — balance gauge and purchase input.
 - `src/components/PurchaseProjection.jsx` — what-if purchase results.
-- `src/components/SilentGrace.jsx` — edit, review and submit a support request.
-- `src/components/DemoControls.jsx` — balance, credit limit and target settings, plus simulated submission failure.
+- `src/components/RequestGrace.jsx` — edit, review and submit a support request.
+- `src/components/DemoControls.jsx` — balance, credit limit and target settings.
 - `src/account.js` — initial demo data, money parsing and gauge calculations.
 - `src/utils/format.js` — currency and percentage display helpers.
 - `src/style.css` — page styling.
@@ -40,6 +40,10 @@ Start with `App.jsx` to see how the screen fits together, then open the componen
 2. Enter £50 in the purchase preview. Show the projected £330, 33% and £30 above Alex’s target. Clear the preview.
 3. Ask for payment support. Review and confirm the editable message. Show reference AG-014 and pending review.
 
-Demo controls can change the current balance, credit limit and credit limit target and simulate support submission failure. Turn the support failure control off to retry the same draft.
+Demo controls can change the current balance, credit limit and credit limit target.
 
 See `project-brief.md` for the pitch, six-slide outline and judge Q&A.
+
+## Request Grace status demo
+
+Edit and review the request, then read the disclaimer and acknowledge the simple terms before sending. Use “Update request status” to advance from received to reviewing, then to a random accepted or declined decision. The decision stays fixed until Reset demo. No real request is sent or payment arrangement created.
