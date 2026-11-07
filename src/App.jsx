@@ -9,6 +9,7 @@ import ThemeToggle from './components/ThemeToggle.jsx';
 import StatementAnalysis from './components/StatementAnalysis.jsx';
 import HomeSpendingSummary from './components/HomeSpendingSummary.jsx';
 import useSavedStatement from './hooks/useSavedStatement.js';
+import { setTransactionIncluded } from './statements/selection.js';
 
 // App owns the data shared by the panels below. Props pass that data to each panel.
 export default function App() {
@@ -36,6 +37,10 @@ export default function App() {
     setPage(destination);
     // Move keyboard focus to the screen title after React updates the view.
     requestAnimationFrame(() => heading.current?.focus());
+  }
+
+  function selectTransaction(id, included) {
+    if (savedStatement) updateSavedStatement(setTransactionIncluded(savedStatement, id, included));
   }
 
   function clearStatement() {
@@ -80,6 +85,7 @@ export default function App() {
           {savedStatement && <HomeSpendingSummary
             key={`${savedStatement.fileName}-${savedStatement.savedAt}`}
             statement={savedStatement}
+            onSelect={selectTransaction}
             onManage={() => navigate('statements')}
             onClear={clearStatement}
           />}
@@ -98,6 +104,7 @@ export default function App() {
           <StatementAnalysis key={statementKey}
             savedStatement={savedStatement}
             onSave={updateSavedStatement}
+            onSelect={selectTransaction}
             onClear={clearStatement}
             onViewHome={() => navigate('home')}
           />

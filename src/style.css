@@ -366,3 +366,6 @@ td select { min-width: 210px; margin: 0; }
 .home-transactions li > strong { white-space: nowrap; }
 .transaction-description { display: block; overflow-wrap: anywhere; }
 .transaction-date { display: block; font-size: 0.85rem; margin-top: 4px; }
+
+.transaction-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 10px; }
+.transaction-actions strong { white-space: nowrap; }

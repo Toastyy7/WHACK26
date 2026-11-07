@@ -7,6 +7,7 @@ export function loadStatement(storage) {
     if (saved?.version !== 1 || typeof saved.fileName !== 'string' || !Array.isArray(saved.result?.transactions)) return null;
     const valid = saved.result.transactions.every((row) =>
       typeof row.id === 'string' && typeof row.description === 'string' && typeof row.date === 'string' &&
+      (row.included === undefined || typeof row.included === 'boolean') &&
       typeof row.category === 'string' && Number.isSafeInteger(row.amount) && row.amount >= 0 &&
       (row.isoDate === null || (typeof row.isoDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(row.isoDate))));
     return valid ? saved : null;

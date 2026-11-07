@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { categories, summarize } from '../statements/categories.js';
 import { formatMoney, formatPercent } from '../utils/format.js';
+import { includedTransactions } from '../statements/selection.js';
 
-export default function StatementAnalysis({ savedStatement, onSave, onClear, onViewHome }) {
+export default function StatementAnalysis({ savedStatement, onSave, onClear, onViewHome, onSelect }) {
   // App owns saved results so Home and this screen always use the same transactions.
   const result = savedStatement?.result ?? null;
   const [pendingFileName, setPendingFileName] = useState('');
@@ -62,9 +63,11 @@ export default function StatementAnalysis({ savedStatement, onSave, onClear, onV
   }
 
   const transactions = result?.transactions ?? [];
-  const groups = summarize(transactions);
+  const selected = includedTransactions(transactions);
+  const groups = summarize(selected);
+  const selectedTotal = selected.reduce((sum, transaction) => sum + transaction.amount, 0);
   const total = transactions.reduce((sum, transaction) => sum + transaction.amount, 0);
-  const needsReview = transactions.filter((transaction) => transaction.category === 'Other / needs review').length;
+  const needsReview = selected.filter((transaction) => transaction.category === 'Other / needs review').length;
 
   return (
     <section className="card statement-analysis" aria-busy={busy}>
@@ -100,35 +103,38 @@ export default function StatementAnalysis({ savedStatement, onSave, onClear, onV
             {result.unresolved > 0 && <p>{result.unresolved} ambiguous entries need checking against the original PDF.</p>}
           </div>
           <div className="statement-stats">
-            <div><span>Total outgoing</span><strong>{formatMoney(total)}</strong></div>
-            <div><span>Outgoing transactions</span><strong>{transactions.length}</strong></div>
+            <div><span>Selected outgoing</span><strong>{formatMoney(selectedTotal)}</strong></div>
+            <div><span>Selected transactions</span><strong>{selected.length} of {transactions.length}</strong></div>
             <div><span>Uncategorised</span><strong>{needsReview}</strong></div>
           </div>
-          <h3>Spending by category</h3>
+          <h3>Selected spending by category</h3>
           <p className="muted">Suggested from merchant names and descriptions. Transfers and cash are included in outgoing totals; they may not represent purchases. Income and refunds in the incoming column are excluded.</p>
           <ul className="category-summary">
             {groups.map((group) => (
               <li key={group.category}>
                 <div className="category-heading">
                   <span>{group.category} · {group.count} payment{group.count === 1 ? '' : 's'}</span>
-                  <strong>{formatMoney(group.amount)} ({formatPercent(total ? group.amount / total * 100 : 0)})</strong>
+                  <strong>{formatMoney(group.amount)} ({formatPercent(selectedTotal ? group.amount / selectedTotal * 100 : 0)})</strong>
                 </div>
                 <div className="category-track" aria-hidden="true">
-                  <div style={{ width: `${total ? group.amount / total * 100 : 0}%` }} />
+                  <div style={{ width: `${selectedTotal ? group.amount / selectedTotal * 100 : 0}%` }} />
                 </div>
               </li>
             ))}
           </ul>
           <details className="transaction-review">
             <summary>Review all {transactions.length} outgoing transactions and edit categories</summary>
-            <p>Category edits update the summary immediately. The page number helps you check the original statement.</p>
+            <p>Tick transactions to include them on Home and in category totals. Untick to remove them; you can add them back at any time. The original extracted total above stays available for checking against the PDF.</p>
             <div className="table-scroll" tabIndex={0} role="region" aria-label="Outgoing transaction table">
               <table>
                 <caption>Extracted outgoing transactions</caption>
-                <thead><tr><th scope="col">Date</th><th scope="col">Description</th><th scope="col">Page</th><th scope="col">Outgoing</th><th scope="col">Category</th></tr></thead>
+                <thead><tr><th scope="col">Include</th><th scope="col">Date</th><th scope="col">Description</th><th scope="col">Page</th><th scope="col">Outgoing</th><th scope="col">Category</th></tr></thead>
                 <tbody>
                   {transactions.map((transaction) => (
                     <tr key={transaction.id}>
+                      <td><input type="checkbox" checked={transaction.included !== false}
+                        aria-label={`Include ${transaction.description}, ${transaction.date}, ${formatMoney(transaction.amount)}`}
+                        onChange={(event) => onSelect(transaction.id, event.target.checked)} /></td>
                       <td>{transaction.date}</td><td>{transaction.description}</td><td>{transaction.page}</td>
                       <td className="amount-cell">{formatMoney(transaction.amount)}</td>
                       <td><select aria-label={`Category for ${transaction.description} on ${transaction.date}`}

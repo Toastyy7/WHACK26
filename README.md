@@ -72,3 +72,7 @@ After a successful upload, open Home (or select **View summary on Home**) to see
 - `src/hooks/useSavedStatement.js` — shared saved state and storage error handling.
 - `src/statements/storage.js` — versioned browser storage, loading and removal.
 - `src/statements/dates.js` — calendar dates, statement ranges and grouping.
+
+### Choose which transactions to include
+
+Use **Remove** beside a Home transaction to exclude it from the list and spending total. Expand **Add removed transactions** to restore it. You can also use the **Include** checkboxes in Statement analysis’s transaction table. Category totals follow the selection; the PDF reconciliation always uses all extracted transactions. Selections are saved after refresh and cleared by Reset demo.
