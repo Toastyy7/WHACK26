@@ -19,14 +19,27 @@ npm run build
 
 The first install needs network access. Copy the source files into your team repo and leave `node_modules` and `dist` out of Git.
 
+## Where to find the code
+
+- `src/main.jsx` — starts React and loads the stylesheet.
+- `src/App.jsx` — page layout, shared account state and demo reset.
+- `src/components/AccountOverview.jsx` — current balance and credit limit.
+- `src/components/SafeZoneGauge.jsx` — balance gauge and purchase input.
+- `src/components/PurchaseProjection.jsx` — what-if purchase results.
+- `src/components/SilentGrace.jsx` — edit, review and submit a support request.
+- `src/components/DemoControls.jsx` — balance, credit limit and target settings, plus simulated submission failure.
+- `src/account.js` — initial demo data, money parsing and gauge calculations.
+- `src/utils/format.js` — currency and percentage display helpers.
+- `src/style.css` — page styling.
+
+Start with `App.jsx` to see how the screen fits together, then open the component you want to change. Money is stored in integer pence, so `28000` represents £280. The purchase input stays in the gauge component; shared account data lives in `App` and components change it through `updateAccount`.
+
 ## Demo in 90 seconds
 
-1. Start at Alex’s standard dashboard with £280 used out of £1,000 and £25 due on 14 November.
-2. Turn on Adaptive Mode. Enter £50 in the purchase preview. Show the projected £330, 33% and £30 above Alex’s target. Clear the preview.
-3. Start the weekly plan with a £50 buffer. Run the scheduled check. Show that £10 posted and £15 remains due.
-4. Open Demo controls. Advance one week and change the available bank balance to £55. Run the next check and show why it skipped.
-5. Ask for payment support. Review and confirm the editable message. Show reference AG-014, pending review and the £15 still due.
+1. Start at Alex’s standard dashboard with £280 used out of £1,000.
+2. Enter £50 in the purchase preview. Show the projected £330, 33% and £30 above Alex’s target. Clear the preview.
+3. Ask for payment support. Review and confirm the editable message. Show reference AG-014 and pending review.
 
-Demo controls can simulate stale or unavailable bank data, payment failure and support submission failure. Turn the support failure control off to retry the same draft. A scheduled payment runs once per demo week. Weeks advance the scheduler while the demo keeps the original statement and due date. All posted payments in the fixture count towards that statement minimum.
+Demo controls can change the current balance, credit limit and credit limit target and simulate support submission failure. Turn the support failure control off to retry the same draft.
 
 See `project-brief.md` for the pitch, six-slide outline and judge Q&A.
