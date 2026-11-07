@@ -1,0 +1,28 @@
+{
+  "manifest_version": 3,
+  "name": "CheckoutGuard - Spending Friction & Impulse Shield",
+  "version": "1.0.0",
+  "description": "Protects against impulse overspending with automated checkout detection, budget impact preview, and reflection cooldowns.",
+  "permissions": [
+    "storage",
+    "activeTab"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "CheckoutGuard Settings"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "css": [
+        "content.css"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ]
+}
