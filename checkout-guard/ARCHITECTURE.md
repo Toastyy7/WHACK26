@@ -25,6 +25,8 @@ General detection requires a score of at least 10 and at least two categories: v
 
 Only field presence is inspected; card-number/CVV values are not read. Only visible total elements outside the extension overlay are considered. An explicit total takes precedence; a foreign-currency total cannot fall through to a GBP product price elsewhere. The fallback accepts labels starting with Total, Order total, Grand total or Estimated total, not Subtotal. Ambiguous amounts or other currencies produce no projection. The user may type a GBP amount instead. There is no invented purchase price or FX conversion.
 
+Shopify one-page checkouts, including GamerSupps, are recognised using the visible payment-action cluster and hosted card-field iframe elements. Card inputs inside those frames are not accessed. The checkout payment button can supply a GBP total; foreign-currency prices still use the manual GBP fallback. Regression tests cover the modern `/checkouts/cn/` route, hosted fields and Pay now action.
+
 ## Lifecycle
 
 The content script loads settings once and subscribes to relevant local storage changes. Read failures do not activate a guessed budget. A guarded refresh scans after external DOM changes, including text-node changes. Changes inside the extension's own UI are ignored to avoid observation loops or repeated screen-reader announcements. A lightweight URL check covers SPA `pushState` and `replaceState` without modifying a site's History API. Navigating away from a checkout closes its dialog.

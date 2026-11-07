@@ -224,6 +224,23 @@ try:
         expect(detection.get_by_role('dialog')).to_be_visible()
         print('PASS detection: domain boundaries, Amazon checkout, product-page fast path, hidden-tab deferral')
 
+        # Shopify one-page checkout: card inputs are cross-origin frames, not top-level inputs.
+        shopify = extension.new_page()
+        shopify.route('https://checkout.pci.shopifyinc.com/**', lambda route: route.fulfill(body='<html></html>', content_type='text/html'))
+        shopify.route('https://gamersupps.gg/**', lambda route: route.fulfill(body='''<!doctype html><html><body>
+          <main><h1>Gamer Supps Checkout</h1><form>
+            <iframe title="Card number" name="card-fields-number-test" src="https://checkout.pci.shopifyinc.com/build/test/number-ltr.html"></iframe>
+            <div data-testid="onepage-pay-button-cluster"><button type="button" id="checkout-pay-button">Pay now £40.00</button></div>
+          </form></main></body></html>''', content_type='text/html'))
+        shopify.goto('https://gamersupps.gg/checkouts/cn/synthetic-test-order/en-gb')
+        inject(shopify)
+        expect(shopify.get_by_role('dialog')).to_be_visible()
+        expect(shopify.locator('#cg-order-amount')).to_have_text('£40.00')
+        shopify.locator('#cg-close').click()
+        shopify.locator('#checkout-pay-button').evaluate("el => el.textContent = 'Pay now $40.00'")
+        expect(shopify.locator('#cg-manual')).to_be_visible()
+        print('PASS GamerSupps/Shopify: framed payment fields, one-page payment action, GBP total and foreign-currency fallback')
+
         popup = extension.new_page()
         popup.goto(base + '/checkout-guard/popup.html')
         expect(popup.locator('#saveBtn')).to_be_enabled()

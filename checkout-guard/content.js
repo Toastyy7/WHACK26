@@ -115,6 +115,7 @@
       '.step[data-step]',
       '[data-checkout-step]',
       '#checkout-step-payment',
+      '[data-testid="onepage-pay-button-cluster"]',
       '.opc-wrapper-opc',
       '#payment-form'
     ];
@@ -154,7 +155,10 @@
       'input[name="cvc" i]',
       '.StripeElement',
       'iframe[src*="js.stripe.com/v3/elements"]',
-      'iframe[src*="paypal.com/smart/buttons"]'
+      'iframe[src*="paypal.com/smart/buttons"]',
+      'iframe[src^="https://checkout.pci.shopifyinc.com/"]',
+      'iframe[src^="https://checkout.shopifycs.com/"]',
+      'iframe[name^="card-fields-"]'
     ];
     const visiblePaymentFields = Array.from(
       document.querySelectorAll(strictPaymentSelectors.join(", "))
@@ -189,6 +193,7 @@
 
     // Category 4: High-Intent Final Order Action Buttons (+5 pts)
     const finalCheckoutBtn = buttons.find((btn) => {
+      if (btn.id === 'checkout-pay-button') return true;
       const text = (btn.innerText || btn.value || "").trim().toLowerCase();
       return /^(place order|complete purchase|pay now|submit order|pay with card|confirm (and|&) pay|authorize payment)/i.test(text);
     });
@@ -246,6 +251,7 @@
       '[data-checkout-total]', '#order-total', '.order-total', '.checkout-total',
       '[data-test="total-amount"]', '#subtotals-marketplace-table .grand-total-price',
       'td.grand-total-price', '#orderSummary .grand-total-price',
+      '#checkout-pay-button',
     ];
     for (const selector of selectors) {
       for (const element of document.querySelectorAll(selector)) {

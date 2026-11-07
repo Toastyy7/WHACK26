@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "CheckoutGuard - Spending & Impulse Shield",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "browser_specific_settings": {
     "gecko": {
       "id": "checkout-guard@whack26.local",
