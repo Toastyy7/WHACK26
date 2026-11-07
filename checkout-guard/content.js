@@ -282,7 +282,7 @@
         <button type="button" id="cg-close" aria-label="Close preview">×</button>
         <div class="cg-badge">🛡️ CheckoutGuard</div>
         <h2 id="cg-modal-title" class="cg-title">Take a breath before you buy</h2>
-        <p id="cg-description" class="cg-subtitle">A quick look at how this order affects your monthly budget. This preview does not record a purchase.</p>
+        <p id="cg-description" class="cg-subtitle">A quick look at how this order affects your monthly budget. Continuing records this amount in your dashboard as a planned transaction, not a confirmed payment.</p>
         <div class="cg-impact-card">
           <div class="cg-impact-row"><span id="cg-order-label">Detected order:</span><strong id="cg-order-amount"></strong></div>
           <div id="cg-manual" hidden>
@@ -309,6 +309,8 @@
     let interval;
     let manualAmount = null;
     let lastRender = '';
+    let savingPurchase = false;
+    const purchaseId = crypto.randomUUID();
     const amountInput = find('#cg-purchase-input');
     find('#cg-manual').hidden = total !== null;
 
@@ -392,8 +394,31 @@
       render();
     });
     find('#cg-close').addEventListener('click', () => close(true));
-    find('#cg-proceed').addEventListener('click', () => {
-      if (Date.now() >= deadline) close(true);
+    find('#cg-proceed').addEventListener('click', async () => {
+      if (Date.now() < deadline || savingPurchase) return;
+      const purchase = total ?? manualAmount;
+      if (!Number.isSafeInteger(purchase) || purchase <= 0) {
+        find('#cg-budget-status').textContent = 'Enter a GBP amount greater than £0 before continuing.';
+        amountInput.focus();
+        return;
+      }
+      savingPurchase = true;
+      const button = find('#cg-proceed');
+      button.disabled = true;
+      button.textContent = 'Saving to dashboard…';
+      const now = new Date();
+      const date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      try {
+        await guard.queuePurchase({ version: 1, id: purchaseId, amount: purchase,
+          currency: 'GBP', merchant: location.hostname, date });
+        if (overlay.isConnected) close(true);
+      } catch (error) {
+        find('#cg-budget-status').textContent = `Could not save the checkout: ${error.message} Try again.`;
+        button.disabled = false;
+        button.textContent = 'Retry and continue to checkout';
+      } finally {
+        savingPurchase = false;
+      }
     });
     find('#cg-step-away').addEventListener('click', () => {
       close(true);

@@ -21,7 +21,8 @@ export function parsePoundsToPence(value) {
 // Pure calculation: return display values without changing the account.
 // These labels describe the chosen target, rather than predicting a credit score.
 export function getGaugeState(balance, limit, target) {
-  const percentage = (balance * 100) / limit;
+  // A balance below zero has no credit limit in use; keep the gauge at zero.
+  const percentage = (Math.max(0, balance) * 100) / limit;
   // The colour follows the same boundaries as the text label.
   let zone = 'green';
   let label = 'Within your target';

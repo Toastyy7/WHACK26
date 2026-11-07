@@ -17,7 +17,7 @@ Persisted keys remain compatible with the original prototype: `isEnabled`, `mont
 
 One shared calculation powers popup and checkout gauges: green below 80%, amber up to 100%, red above 100%. The actual percentage is never clamped; bar width and the meter's numeric value are capped at 100 and accessible text retains the full percentage and warning.
 
-These monthly-budget bands are independent of the web dashboard's credit-limit target. There is no claim that either gauge predicts a credit score. The extension and dashboard do not share state or pretend to connect to a bank.
+These monthly-budget bands are independent of the web dashboard's credit-limit target. There is no claim that either gauge predicts a credit score. The budget settings remain independent. Continuing through the guard now queues a planned checkout transaction for the local dashboard; neither connects to a bank.
 
 ## Checkout detection and totals
 
@@ -46,3 +46,13 @@ Dynamic values are assigned with `textContent`, DOM properties or numeric styles
 `npm run lint:extension` validates the same source with Mozilla's linter. `npm run pack:extension` excludes fixture/documentation files and produces an unsigned ZIP. Temporary Firefox installation can exercise real storage/content-script isolation; permanent Firefox installation requires Mozilla signing.
 
 All preferences are local to each browser. There is no network transmission of shopping details or synchronisation with the web demo. There are no real banking credentials, payments, support messages or analytics.
+
+## Dashboard transaction sync
+
+`core.js` stores each checkout under its own `checkoutGuard.purchase.<id>` key. Continue to checkout requires a positive GBP total, disables itself while saving, and reuses the same event ID if saving is retried. Closing, Escape and Leave checkout do not create a transaction. The merchant is the hostname; URLs, query parameters and payment details are not stored.
+
+`sync.js` runs a bridge only on the explicit local dashboard origins: HTTP `localhost` or `127.0.0.1`, ports 5173, 4173 and 3000. The dashboard must also expose its v1 meta marker and announce readiness. The bridge delivers pending purchases via same-window, origin-checked messages, watches extension storage and retries periodically. No remote server or new extension permission is required. A deployed dashboard would need its exact origin added to this allowlist.
+
+The website validates each purchase, assigns a stable transaction ID, saves it locally and acknowledges it only after saving succeeds. The extension then removes the pending event. Transactions use `source: checkout` and `status: planned`; they are excluded from PDF reconciliation, included in selected totals and deducted by the current-month balance rule. Repeated delivery does not duplicate them. A small local receipt list stores event IDs only, surviving demo resets to prevent delayed retries from resurrecting cleared transactions. Reset still removes transaction details and the balance deductions.
+
+Reload the unpacked extension after changing its scripts or manifest, refresh the dashboard and the checkout tab, then open the dashboard on one of the allowed origins in the same browser/profile. If it is closed, pending events remain in extension storage until it is opened. This records the user’s checkout intention, not proof of payment, and never clicks the merchant’s payment button.

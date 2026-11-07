@@ -10,6 +10,8 @@ import StatementAnalysis from './components/StatementAnalysis.jsx';
 import HomeSpendingSummary from './components/HomeSpendingSummary.jsx';
 import useSavedStatement from './hooks/useSavedStatement.js';
 import { setTransactionIncluded } from './statements/selection.js';
+import { monthlyBalance } from './statements/monthlyBalance.js';
+import useCurrentMonth from './hooks/useCurrentMonth.js';
 
 // App owns the data shared by the panels below. Props pass that data to each panel.
 export default function App() {
@@ -21,6 +23,9 @@ export default function App() {
   const [statementKey, setStatementKey] = useState(0);
   const heading = useRef(null);
   const [account, setAccount] = useState(createInitialAccount);
+  const month = useCurrentMonth();
+  const adjustment = monthlyBalance(account.balance, savedStatement?.result.transactions ?? [], month);
+  const displayedAccount = { ...account, balance: adjustment.balance };
   // Changing this key tells React to recreate the panels and clear their local state.
   const [resetKey, setResetKey] = useState(0);
   // useRef keeps the pending timeout ID without causing a render when it changes.
@@ -80,8 +85,8 @@ export default function App() {
       <div key={resetKey}>
         {/* Keep screens mounted so navigating home preserves the request and preview. */}
         <div hidden={page !== 'home'}>
-          <AccountOverview account={account} />
-          <SafeZoneGauge account={account} />
+          <AccountOverview account={displayedAccount} monthlyOutgoing={adjustment.outgoing} month={month} />
+          <SafeZoneGauge account={displayedAccount} />
           {savedStatement && <HomeSpendingSummary
             key={`${savedStatement.fileName}-${savedStatement.savedAt}`}
             statement={savedStatement}

@@ -2,6 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { categories, summarize } from '../statements/categories.js';
 import { formatMoney, formatPercent } from '../utils/format.js';
 import { includedTransactions } from '../statements/selection.js';
+import AddTransactionForm from './AddTransactionForm.jsx';
+import { appendManualTransaction, importedTransactions } from '../statements/manualTransactions.js';
 
 export default function StatementAnalysis({ savedStatement, onSave, onClear, onViewHome, onSelect }) {
   // App owns saved results so Home and this screen always use the same transactions.
@@ -37,7 +39,9 @@ export default function StatementAnalysis({ savedStatement, onSave, onClear, onV
       const { readStatement } = await import('../statements/readPdf.js');
       const extracted = await readStatement(file);
       if (id === uploadId.current) {
-        onSave({ fileName: file.name, result: extracted, savedAt: Date.now() });
+        // Replacing a PDF keeps manually entered payments.
+        const manual = savedStatement?.result.transactions.filter((row) => row.source === 'manual' || row.source === 'checkout') ?? [];
+        onSave({ fileName: file.name, result: { ...extracted, transactions: [...extracted.transactions, ...manual] }, savedAt: Date.now() });
         setPendingFileName('');
       }
     } catch (failure) {
@@ -66,7 +70,8 @@ export default function StatementAnalysis({ savedStatement, onSave, onClear, onV
   const selected = includedTransactions(transactions);
   const groups = summarize(selected);
   const selectedTotal = selected.reduce((sum, transaction) => sum + transaction.amount, 0);
-  const total = transactions.reduce((sum, transaction) => sum + transaction.amount, 0);
+  const imported = importedTransactions(transactions);
+  const total = imported.reduce((sum, transaction) => sum + transaction.amount, 0);
   const needsReview = selected.filter((transaction) => transaction.category === 'Other / needs review').length;
 
   return (
@@ -87,11 +92,13 @@ export default function StatementAnalysis({ savedStatement, onSave, onClear, onV
       )}
       <div role="status">{busy && <p>Reading the statement and categorising outgoing payments…</p>}</div>
       {error && <p role="alert" className="notice">{error}</p>}
+      <AddTransactionForm disabled={busy}
+        onAdd={(transaction) => onSave(appendManualTransaction(savedStatement, transaction))} />
       {result && !busy && (
         <>
           <p role="status">Results are available on Home. If browser storage is available, they will also remain after refresh.</p>
           <button className="secondary" onClick={onViewHome}>View summary on Home</button>
-          <div className="notice" role="status">
+          {result.pageCount > 0 && <div className="notice" role="status">
             {result.declaredTotal === null ? (
               <p>No outgoing summary total was detected. Completeness is unverified; compare the transactions below with your statement.</p>
             ) : total === result.declaredTotal ? (
@@ -101,7 +108,7 @@ export default function StatementAnalysis({ savedStatement, onSave, onClear, onV
             )}
             <p>Recognised transaction tables on {result.supportedPages} of {result.pageCount} pages. Other pages may contain notes or unsupported layouts.</p>
             {result.unresolved > 0 && <p>{result.unresolved} ambiguous entries need checking against the original PDF.</p>}
-          </div>
+          </div>}
           <div className="statement-stats">
             <div><span>Selected outgoing</span><strong>{formatMoney(selectedTotal)}</strong></div>
             <div><span>Selected transactions</span><strong>{selected.length} of {transactions.length}</strong></div>
@@ -124,18 +131,18 @@ export default function StatementAnalysis({ savedStatement, onSave, onClear, onV
           </ul>
           <details className="transaction-review">
             <summary>Review all {transactions.length} outgoing transactions and edit categories</summary>
-            <p>Tick transactions to include them on Home and in category totals. Untick to remove them; you can add them back at any time. The original extracted total above stays available for checking against the PDF.</p>
+            <p>Tick transactions to include them on Home and in category totals. Untick to remove them; you can add them back at any time. Manual entries are marked below and included in spending totals. Only imported entries are used to check the PDF total.</p>
             <div className="table-scroll" tabIndex={0} role="region" aria-label="Outgoing transaction table">
               <table>
-                <caption>Extracted outgoing transactions</caption>
-                <thead><tr><th scope="col">Include</th><th scope="col">Date</th><th scope="col">Description</th><th scope="col">Page</th><th scope="col">Outgoing</th><th scope="col">Category</th></tr></thead>
+                <caption>Outgoing transactions</caption>
+                <thead><tr><th scope="col">Include</th><th scope="col">Date</th><th scope="col">Description</th><th scope="col">Source / page</th><th scope="col">Outgoing</th><th scope="col">Category</th></tr></thead>
                 <tbody>
                   {transactions.map((transaction) => (
                     <tr key={transaction.id}>
                       <td><input type="checkbox" checked={transaction.included !== false}
                         aria-label={`Include ${transaction.description}, ${transaction.date}, ${formatMoney(transaction.amount)}`}
                         onChange={(event) => onSelect(transaction.id, event.target.checked)} /></td>
-                      <td>{transaction.date}</td><td>{transaction.description}</td><td>{transaction.page}</td>
+                      <td>{transaction.date}</td><td>{transaction.description}</td><td>{transaction.source === 'checkout' ? 'Checkout (planned)' : transaction.source === 'manual' ? 'Manual' : transaction.page}</td>
                       <td className="amount-cell">{formatMoney(transaction.amount)}</td>
                       <td><select aria-label={`Category for ${transaction.description} on ${transaction.date}`}
                         value={transaction.category} onChange={(event) => changeCategory(transaction.id, event.target.value)}>

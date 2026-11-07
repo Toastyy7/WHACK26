@@ -2,6 +2,7 @@ import React from 'react';
 import { formatDate } from '../statements/dates.js';
 import { formatMoney } from '../utils/format.js';
 import { includedTransactions } from '../statements/selection.js';
+import { importedTransactions } from '../statements/manualTransactions.js';
 
 // Home shows a simple statement snapshot; detailed analysis stays on its own screen.
 export default function HomeSpendingSummary({ statement, onManage, onClear, onSelect }) {
@@ -12,7 +13,8 @@ export default function HomeSpendingSummary({ statement, onManage, onClear, onSe
     (b.isoDate || '').localeCompare(a.isoDate || ''));
   const total = transactions.reduce((sum, transaction) => sum + transaction.amount, 0);
   const dated = transactions.map((transaction) => transaction.isoDate).filter(Boolean);
-  const unverified = statement.result.declaredTotal == null || statement.result.declaredTotal !== imported.reduce((sum, transaction) => sum + transaction.amount, 0);
+  const pdfTransactions = importedTransactions(imported);
+  const unverified = pdfTransactions.length > 0 && (statement.result.declaredTotal == null || statement.result.declaredTotal !== pdfTransactions.reduce((sum, transaction) => sum + transaction.amount, 0));
 
   return (
     <section className="card home-spending">
@@ -31,6 +33,7 @@ export default function HomeSpendingSummary({ statement, onManage, onClear, onSe
           <li key={transaction.id}>
             <div>
               <span className="transaction-description">{transaction.description}</span>
+              {transaction.source === 'checkout' && <span className="muted transaction-date">Planned checkout</span>}
               <span className="muted transaction-date">
                 {transaction.isoDate ? formatDate(transaction.isoDate) : transaction.date || 'Date not available'}
               </span>
@@ -49,6 +52,7 @@ export default function HomeSpendingSummary({ statement, onManage, onClear, onSe
           <ul className="home-transactions">
             {removed.map((transaction) => <li key={transaction.id}>
               <div><span className="transaction-description">{transaction.description}</span>
+              {transaction.source === 'checkout' && <span className="muted transaction-date">Planned checkout</span>}
                 <span className="muted transaction-date">{transaction.isoDate ? formatDate(transaction.isoDate) : transaction.date}</span>
               </div>
               <div className="transaction-actions">

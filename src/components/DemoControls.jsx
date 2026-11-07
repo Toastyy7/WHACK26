@@ -37,7 +37,7 @@ export default function DemoControls({
       <summary>Demo controls</summary>
       <div className="controls">
         <MoneyControl
-          label="Current balance (£)"
+          label="Starting balance before this month’s transactions (£)"
           amount={account.balance}
           minimum={0}
           onSave={(balance) => updateAccount({ balance })}
@@ -68,7 +68,7 @@ export default function DemoControls({
         </label>
       </div>
       <p>
-        Amounts save when you leave the field. Balance must be £0 or more and
+        Selected statement transactions from the current month are deducted from this starting balance. Amounts save when you leave the field. Starting balance must be £0 or more and
         credit limit must be at least £0.01. Use up to two decimal places;
         invalid entries revert to the previous amount.
       </p>

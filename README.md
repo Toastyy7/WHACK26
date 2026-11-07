@@ -76,3 +76,19 @@ After a successful upload, open Home (or select **View summary on Home**) to see
 ### Choose which transactions to include
 
 Use **Remove** beside a Home transaction to exclude it from the list and spending total. Expand **Add removed transactions** to restore it. You can also use the **Include** checkboxes in Statement analysis’s transaction table. Category totals follow the selection; the PDF reconciliation always uses all extracted transactions. Selections are saved after refresh and cleared by Reset demo.
+
+### Current-month balance
+
+The Home balance equals the demo starting balance minus selected outgoing transactions dated in the browser’s current calendar month and year. Prior months, other years, removed transactions and unknown dates do not affect it. Removing or restoring a transaction recalculates the balance; importing, refreshing and category edits do not repeatedly deduct the same amount. The demo controls edit the starting balance. Clearing the statement or Reset demo removes its deductions. The current month refreshes automatically while the app is open.
+
+### Add an outgoing transaction manually
+
+In Statement analysis, use **Add a transaction** to choose a type/category and enter a price in pounds, merchant/payee and date. You can do this without a PDF. Entries appear on Home, are saved in this browser and follow the same current-month balance deduction and include/remove controls as imported transactions. Manual entries are labelled separately and excluded from the PDF reconciliation total. Replacing a PDF keeps manual entries; Clear statement or Reset demo clears all entries.
+
+### Extension checkout sync
+
+Reload the unpacked **checkout-guard** extension, then refresh the dashboard and checkout tabs. Keep the dashboard on `http://127.0.0.1:5173` (or localhost; ports 4173 and 3000 are also supported) in the same browser/profile as the extension.
+
+After the reflection pause, **Continue to checkout** saves the GBP amount and merchant hostname as a **planned checkout** transaction dated today. It appears on Home and reduces the balance through the existing current-month calculation. Removing it restores that deduction. Continuing does not submit a real order or confirm payment.
+
+If the dashboard is closed, the extension queues the transaction until it opens. Retry messages use stable IDs to avoid duplicate deductions. Checkout records survive refresh, and Reset demo removes them along with other transactions. Receipt IDs alone remain locally to prevent replay after reset. PDF replacement preserves manually added and checkout transactions; PDF reconciliation excludes both.

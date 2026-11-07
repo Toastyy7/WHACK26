@@ -92,7 +92,41 @@
     return () => event.removeListener(handle);
   }
 
+
+  const purchasePrefix = 'checkoutGuard.purchase.';
+  function validPurchase(purchase) {
+    return purchase?.version === 1 && typeof purchase.id === 'string' &&
+      /^[a-zA-Z0-9-]{1,100}$/.test(purchase.id) && Number.isSafeInteger(purchase.amount) &&
+      purchase.amount > 0 && purchase.amount <= 999999999 && purchase.currency === 'GBP' &&
+      typeof purchase.merchant === 'string' && purchase.merchant.length > 0 && purchase.merchant.length <= 200 &&
+      typeof purchase.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(purchase.date);
+  }
+
+  async function queuePurchase(purchase) {
+    if (!validPurchase(purchase)) throw new Error('Enter a valid GBP purchase amount before continuing.');
+    // A separate key per event avoids losing simultaneous checkouts in different tabs.
+    await storage('set', { [purchasePrefix + purchase.id]: purchase });
+  }
+
+  async function pendingPurchases() {
+    const data = await storage('get', null);
+    return Object.entries(data).filter(([key, value]) =>
+      key === purchasePrefix + value?.id && validPurchase(value)).map(([, value]) => value);
+  }
+
+  function subscribePurchases(listener) {
+    const event = api()?.extension.storage.onChanged;
+    if (!event) return () => {};
+    const handle = (changes, area) => {
+      if (area === 'local' && Object.keys(changes).some((key) => key.startsWith(purchasePrefix))) listener();
+    };
+    event.addListener(handle);
+    return () => event.removeListener(handle);
+  }
+
   globalThis.CheckoutGuard = Object.freeze({
+    queuePurchase, pendingPurchases, subscribePurchases, validPurchase,
+    acknowledgePurchase: (id) => storage('remove', purchasePrefix + id),
     defaults, pence, parseGbp, normalise, validSettings, money, percent, impact,
     available: () => api() !== null,
     load: async () => normalise(await storage('get', defaults)),
