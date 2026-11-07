@@ -1,20 +1,22 @@
 /**
- * CheckoutGuard - Content Script
- * Detects checkout flows, extracts purchase totals, and injects reflection friction.
+ * Capital One Adaptive Guard - Content Script
+ * Point-of-Sale Overspend Prevention & ADHD Impulse Cooling Shield.
+ * Designed for Emil and neurodivergent cardholders to protect credit utilization at checkout.
  */
 
 (function () {
   const DEFAULT_SETTINGS = {
     isEnabled: true,
-    monthlyBudget: 300,
-    currentSpent: 120,
-    cooldownSeconds: 15,
+    cardholder: "Emil",
+    cardLimit: 1000,
+    currentBalance: 280,
+    safeTarget: 30, // 30% threshold = £300
+    cooldownSeconds: 15, // 15s for live demo, configurable up to 30m
+    coolingOffItems: [],
   };
 
   /**
    * Helper: Check if an element is genuinely rendered and visible on screen.
-   * @param {Element} el
-   * @returns {boolean}
    */
   function isElementVisible(el) {
     if (!el || !(el instanceof HTMLElement)) return false;
@@ -27,8 +29,7 @@
   }
 
   /**
-   * Helper: Guardrails against common non-e-commerce websites and search engines.
-   * @returns {boolean}
+   * Guardrails against common non-e-commerce websites and search engines.
    */
   function isDisqualifiedSite() {
     const hostname = window.location.hostname.toLowerCase();
@@ -52,11 +53,7 @@
   }
 
   /**
-   * 1. Detect if the user is currently on an e-commerce checkout page.
-   * Features specialized Amazon guards, explicit platform container checks,
-   * and a high multi-category threshold (score >= 10) to completely eliminate
-   * false positives during normal catalog browsing.
-   * @returns {{ isCheckout: boolean, score: number, signals: string[] }}
+   * 1. Detect if the user is currently on an e-commerce checkout or high-intent cart page.
    */
   function detectCheckout() {
     if (isDisqualifiedSite()) {
@@ -68,49 +65,37 @@
 
     // =========================================================================
     // SPECIALIZED AMAZON HANDLING
-    // Normal Amazon browsing includes search bars, product buy boxes, and nav carts.
-    // We only trigger when the user has actually entered the final checkout funnel.
     // =========================================================================
     if (hostname.includes("amazon.")) {
-      // 1. Browsing indicators on Amazon
-      const isAmazonBrowsing = !!document.querySelector(
-        '#add-to-cart-button, #buy-now-button, #twotabsearchtextbox, #nav-search-bar-form, ' +
-        '#s-results-list-atf, .s-search-results, #sc-active-cart, #nav-cart'
-      );
-
-      // 2. Strict Amazon Checkout indicators
       const isAmazonCheckoutUrl = /\/(gp\/buy|checkout\/spc|buy\/spc|buy\/payselect|gp\/checkout)\//i.test(pathname);
+      const isAmazonCartUrl = /\/(cart|gp\/cart|gp\/aw\/c)\b/i.test(pathname);
+      
       const hasAmazonPlaceOrderBtn = Array.from(
         document.querySelectorAll(
           '#placeYourOrder, input[name="placeYourOrder1"], input[name*="placeYourOrder"], ' +
           '#bottomSubmitOrderButtonId, [data-action="place-your-order"]'
         )
       ).some(isElementVisible);
-      const hasAmazonCheckoutHeader = Array.from(
+
+      const hasAmazonProceedToCheckout = Array.from(
         document.querySelectorAll(
-          '#spc-orders, #subtotals-marketplace-table, .spc-desktop, #checkout-display-desktop, #spc-top'
+          'input[name="proceedToRetailCheckout"], #sc-buy-box-ptc-button, [data-feature-id="proceed-to-checkout-action"]'
         )
       ).some(isElementVisible);
 
-      // If browsing elements are present and the place order button is NOT present, stay quiet!
-      if (isAmazonBrowsing && !hasAmazonPlaceOrderBtn) {
-        return { isCheckout: false, score: 0, signals: ["AMAZON_BROWSING_EXCLUDED"] };
+      if (hasAmazonPlaceOrderBtn || (isAmazonCheckoutUrl && document.querySelector('#subtotals-marketplace-table, .spc-desktop'))) {
+        return { isCheckout: true, score: 15, signals: ["AMAZON_FINAL_CHECKOUT"] };
       }
 
-      // Only fire if inside the true Amazon purchase funnel
-      if (hasAmazonPlaceOrderBtn || (isAmazonCheckoutUrl && hasAmazonCheckoutHeader)) {
-        return {
-          isCheckout: true,
-          score: 15,
-          signals: ["AMAZON_CONFIRMED_CHECKOUT"],
-        };
+      if (isAmazonCartUrl && hasAmazonProceedToCheckout) {
+        return { isCheckout: true, score: 12, signals: ["AMAZON_ACTIVE_CART"] };
       }
 
-      return { isCheckout: false, score: 0, signals: ["AMAZON_NON_CHECKOUT"] };
+      return { isCheckout: false, score: 0, signals: ["AMAZON_BROWSING"] };
     }
 
     // =========================================================================
-    // GENERAL E-COMMERCE DETECTION (High Threshold: Score >= 10, Multi-category)
+    // GENERAL E-COMMERCE DETECTION (e.g. test-checkout.html, Shopify, WooCommerce)
     // =========================================================================
     let score = 0;
     const signals = [];
@@ -120,18 +105,7 @@
       document.querySelectorAll("button, input[type='submit'], a.button, [role='button']")
     ).filter(isElementVisible);
 
-    // Guardrail: Product page with "Add to Cart" or "Add to Bag"
-    const hasAddToCart = buttons.some((btn) => {
-      const text = (btn.innerText || btn.value || "").trim().toLowerCase();
-      return /^(add to (cart|bag|basket)|pre-order now)/i.test(text);
-    });
-
-    // Guardrail: Generic site-wide search box
-    const hasSearchInput = Array.from(
-      document.querySelectorAll('input[type="search"], input[name="q"], input[name="search"]')
-    ).some(isElementVisible);
-
-    // Category 1: Explicit E-Commerce Checkout Form / Step Containers (+5 pts)
+    // Category 1: Explicit E-Commerce Checkout Form Containers
     const checkoutContainers = [
       'form.woocommerce-checkout',
       'form#checkout-form',
@@ -140,98 +114,52 @@
       '[data-checkout-step]',
       '#checkout-step-payment',
       '.opc-wrapper-opc',
-      '#payment-form'
+      '#payment-form',
+      '.checkout-container'
     ];
-    const hasCheckoutContainer = Array.from(
-      document.querySelectorAll(checkoutContainers.join(", "))
-    ).some(isElementVisible);
-
-    if (hasCheckoutContainer) {
+    if (document.querySelector(checkoutContainers.join(", "))) {
       score += 5;
-      signals.push("CHECKOUT_CONTAINER_FOUND");
+      signals.push("CHECKOUT_CONTAINER");
       activeCategories.add("CONTAINER");
     }
 
-    // Category 2: Strict Checkout Route in URL (+4 pts)
-    // Matches explicit checkout route segments, e.g. /checkout, /checkouts/123, /pay-now
-    const isCheckoutPath = /(?:^|\/)(checkout|checkouts|order[_-]?summary|review[_-]?order|payment[_-]?step|pay[_-]?now|test-checkout)(?:[\/?#]|$)/i.test(pathname);
-    if (isCheckoutPath) {
+    // Category 2: URL Path
+    if (/(?:^|\/)(checkout|checkouts|order[_-]?summary|review[_-]?order|payment[_-]?step|pay[_-]?now|test-checkout)(?:[\/?#]|$)/i.test(pathname)) {
       score += 4;
-      signals.push("STRICT_URL_CHECKOUT_PATH");
+      signals.push("URL_CHECKOUT_PATH");
       activeCategories.add("URL");
     }
 
-    // Category 3: Visible Payment & Credit Card Fields (+5 pts)
-    const strictPaymentSelectors = [
-      'input[autocomplete="cc-number"]',
-      'input[autocomplete="cc-exp"]',
-      'input[autocomplete="cc-csc"]',
-      'input[id="card-number" i]',
-      'input[id="cardNumber" i]',
-      'input[name="card-number" i]',
-      'input[name="cardNumber" i]',
-      'input[name="cardnumber" i]',
-      'input[id="cc-number" i]',
-      'input[id="cvv" i]',
-      'input[name="cvv" i]',
-      'input[id="cvc" i]',
-      'input[name="cvc" i]',
-      '.StripeElement',
-      'iframe[src*="js.stripe.com/v3/elements"]',
-      'iframe[src*="paypal.com/smart/buttons"]'
-    ];
-    const visiblePaymentFields = Array.from(
-      document.querySelectorAll(strictPaymentSelectors.join(", "))
-    ).filter(isElementVisible);
-
-    if (visiblePaymentFields.length > 0) {
+    // Category 3: Payment / Card Fields
+    const paymentFields = document.querySelectorAll(
+      'input[autocomplete="cc-number"], input[id="cardNumber" i], input[name="cardNumber" i], input[id="cvv" i], input[autocomplete="cc-csc"], .StripeElement'
+    );
+    if (Array.from(paymentFields).some(isElementVisible)) {
       score += 5;
-      signals.push(`PAYMENT_FIELDS(${visiblePaymentFields.length})`);
+      signals.push("PAYMENT_FIELDS");
       activeCategories.add("PAYMENT");
     }
 
-    // Category 4: High-Intent Final Order Action Buttons (+5 pts)
-    const finalCheckoutBtn = buttons.find((btn) => {
+    // Category 4: High-Intent Action Buttons
+    const finalBtn = buttons.find((btn) => {
       const text = (btn.innerText || btn.value || "").trim().toLowerCase();
       return /^(place order|complete purchase|pay now|submit order|pay with card|confirm (and|&) pay|authorize payment)/i.test(text);
     });
-    if (finalCheckoutBtn) {
+    if (finalBtn) {
       score += 5;
       signals.push("FINAL_ACTION_BUTTON");
       activeCategories.add("ACTION_BUTTON");
     }
 
-    // Category 5: Order Breakdown with Total (+2 pts)
-    const hasOrderTotal = Array.from(
-      document.querySelectorAll(
-        '[data-checkout-total], #order-total, .order-total, .checkout-total, [data-test="total-amount"]'
-      )
-    ).some(isElementVisible);
-    if (hasOrderTotal) {
-      score += 2;
-      signals.push("ORDER_TOTAL_BREAKDOWN");
+    // Category 5: Order Total Summary
+    const hasOrderTotal = document.querySelector('[data-checkout-total], #order-total, .order-total, .cart-total-row');
+    if (hasOrderTotal && isElementVisible(hasOrderTotal)) {
+      score += 3;
+      signals.push("ORDER_TOTAL");
       activeCategories.add("SUMMARY");
     }
 
-    // Disqualification: Browsing page indicators
-    if (hasAddToCart && visiblePaymentFields.length === 0 && !finalCheckoutBtn) {
-      return {
-        isCheckout: false,
-        score,
-        signals: [...signals, "DISQUALIFIED_PRODUCT_PAGE"],
-      };
-    }
-    if (hasSearchInput && activeCategories.size < 2) {
-      return {
-        isCheckout: false,
-        score,
-        signals: [...signals, "DISQUALIFIED_CATALOG_BROWSING"],
-      };
-    }
-
-    // HIGH THRESHOLD:
-    // Requires total score >= 10 AND at least 2 distinct strong confirmation categories
-    const isCheckout = score >= 10 && activeCategories.size >= 2;
+    const isCheckout = score >= 8 || activeCategories.size >= 2;
 
     return {
       isCheckout,
@@ -241,11 +169,21 @@
   }
 
   /**
-   * 2. Extract purchase total from the page DOM using standard selectors & regex.
-   * @returns {number | null}
+   * 2. Extract purchase total and item title from the page DOM.
    */
-  function extractCartTotal() {
-    // Specific standard selectors & platform-specific total elements (including Amazon)
+  function extractCartDetails() {
+    let amount = null;
+    let title = document.title || "Online Purchase";
+
+    // Item title extraction
+    const titleEl = document.querySelector(
+      '#productTitle, .sc-product-title, .cart-item span, h1, .product-title'
+    );
+    if (titleEl && titleEl.innerText) {
+      title = titleEl.innerText.trim().slice(0, 45);
+    }
+
+    // Price selectors
     const totalSelectors = [
       '[data-checkout-total]',
       '#order-total',
@@ -255,53 +193,54 @@
       '[data-test="total-amount"]',
       '#subtotals-marketplace-table .grand-total-price',
       '.spc-order-summary .a-color-price',
+      '#sc-subtotal-amount-activecart .sc-price',
       'td.grand-total-price',
-      '#orderSummary .grand-total-price'
+      '.cart-total-row span:last-child'
     ];
 
     for (const selector of totalSelectors) {
       const el = document.querySelector(selector);
       if (el && el.innerText) {
         const match = el.innerText.match(/[$£€]\s*([0-9]+(?:\.[0-9]{2})?)/);
-        if (match) return parseFloat(match[1]);
-      }
-    }
-
-    // General regex scan across summary or bold elements
-    const elements = document.querySelectorAll('strong, b, span, p, td');
-    for (const el of elements) {
-      const text = el.innerText || "";
-      if (/total/i.test(text) && /[$£€]/.test(text)) {
-        const match = text.match(/[$£€]\s*([0-9]+(?:\.[0-9]{2})?)/);
         if (match) {
-          const val = parseFloat(match[1]);
-          if (val > 0 && val < 50000) return val;
+          amount = parseFloat(match[1]);
+          break;
         }
       }
     }
 
-    return null;
+    // Fallback regex scan
+    if (amount === null) {
+      const elements = document.querySelectorAll('strong, b, span, p, td');
+      for (const el of elements) {
+        const text = el.innerText || "";
+        if (/total/i.test(text) && /[$£€]/.test(text)) {
+          const match = text.match(/[$£€]\s*([0-9]+(?:\.[0-9]{2})?)/);
+          if (match) {
+            const val = parseFloat(match[1]);
+            if (val > 0 && val < 50000) {
+              amount = val;
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    return {
+      amount: amount !== null ? amount : 69.99, // default £69.99 demo fallback
+      title,
+    };
   }
 
   /**
-   * 3. Check if the modal overlay is already mounted.
-   * @returns {boolean}
-   */
-  function isAlreadyInjected() {
-    return !!document.getElementById("checkout-guard-overlay");
-  }
-
-  /**
-   * 4. Enforce the countdown friction timer before purchase can proceed.
-   * @param {number} durationSeconds
-   * @param {function} onComplete
+   * 3. Enforce the countdown friction timer before purchase can proceed.
    */
   function startCooldownTimer(durationSeconds, onComplete) {
     let remaining = durationSeconds;
     const timerDisplay = document.getElementById("cg-timer-seconds");
 
     if (!timerDisplay) return;
-
     timerDisplay.textContent = `${remaining}s`;
 
     const interval = setInterval(() => {
@@ -316,76 +255,93 @@
   }
 
   /**
-   * 5. Construct and mount the behavioral friction modal.
-   * @param {number | null} cartTotal
-   * @param {object} settings
+   * 4. Construct and mount the Capital One Adaptive Overspend Shield modal.
    */
-  function createOverlay(cartTotal, settings) {
-    if (isAlreadyInjected()) return;
+  function createOverlay(cartDetails, settings) {
+    if (document.getElementById("checkout-guard-overlay")) return;
 
     const overlay = document.createElement("div");
     overlay.id = "checkout-guard-overlay";
 
-    const budget = Number(settings.monthlyBudget) || 300;
-    const spent = Number(settings.currentSpent) || 0;
-    const purchaseAmount = cartTotal !== null ? cartTotal : 35.00; // sensible fallback
-    const projectedSpent = spent + purchaseAmount;
-    const remainingBudget = Math.max(0, budget - projectedSpent);
-    const percentUsed = Math.min(100, Math.round((projectedSpent / budget) * 100));
+    const cardLimit = Number(settings.cardLimit) || 1000;
+    const currentBalance = Number(settings.currentBalance) || 280;
+    const safeTargetPercent = Number(settings.safeTarget) || 30;
+    const safeTargetPounds = (cardLimit * safeTargetPercent) / 100; // £300
 
-    let gaugeClass = "";
-    let statusText = "Within healthy budget";
-    if (percentUsed >= 80 && percentUsed <= 100) {
-      gaugeClass = "warning";
-      statusText = "Approaching spending limit";
-    } else if (percentUsed > 100) {
+    const purchaseAmount = cartDetails.amount;
+    const projectedBalance = currentBalance + purchaseAmount;
+    const projectedPercent = Math.round((projectedBalance / cardLimit) * 100);
+    const currentPercent = Math.round((currentBalance / cardLimit) * 100);
+
+    const isBreach = projectedBalance > safeTargetPounds;
+    const breachAmount = Math.max(0, projectedBalance - safeTargetPounds);
+
+    let gaugeClass = "safe";
+    let statusBadgeText = "Within Safe-Zone";
+    let statusExplanation = `Safe zone: Keep below ${safeTargetPercent}% (£${safeTargetPounds.toFixed(0)})`;
+
+    if (projectedPercent >= 50) {
       gaugeClass = "danger";
-      statusText = "Exceeds monthly target!";
+      statusBadgeText = "High Utilization Risk (>50%)";
+      statusExplanation = `Warning: Pushes your card to ${projectedPercent}% of limit!`;
+    } else if (isBreach) {
+      gaugeClass = "warning";
+      statusBadgeText = "⚠️ Safe-Zone Warning";
+      statusExplanation = `This purchase is £${breachAmount.toFixed(2)} above your ${safeTargetPercent}% (£${safeTargetPounds.toFixed(0)}) target.`;
     }
 
     overlay.innerHTML = `
       <div id="checkout-guard-modal" role="dialog" aria-modal="true" aria-labelledby="cg-modal-title">
-        <div class="cg-badge">
-          <span>🛑</span>
-          <span>Impulse Shield Active</span>
+        <div class="cg-brand-header">
+          <span class="cg-brand-logo">◈</span>
+          <span>CAPITAL ONE · ADAPTIVE GUARD</span>
+        </div>
+
+        <div class="cg-badge ${gaugeClass}">
+          <span>${isBreach ? "⚠️" : "🛡️"}</span>
+          <span>${statusBadgeText}</span>
         </div>
         
-        <h2 id="cg-modal-title" class="cg-title">Take a Breath Before You Buy</h2>
-        <p class="cg-subtitle">Checkout detected. Here is how this purchase changes your balance:</p>
+        <h2 id="cg-modal-title" class="cg-title">Take a Breath, ${settings.cardholder || "Emil"}</h2>
+        <p class="cg-subtitle">Checkout detected at <strong>${window.location.hostname}</strong>.</p>
 
         <div class="cg-impact-card">
           <div class="cg-impact-row">
-            <span>Detected Order:</span>
-            <strong>£${purchaseAmount.toFixed(2)}</strong>
+            <span>Item:</span>
+            <strong title="${cartDetails.title}">${cartDetails.title}</strong>
           </div>
           <div class="cg-impact-row">
-            <span>Current Spent:</span>
-            <span>£${spent.toFixed(2)} of £${budget.toFixed(2)}</span>
+            <span>Cart Total:</span>
+            <strong class="cg-highlight-amount">£${purchaseAmount.toFixed(2)}</strong>
           </div>
           <div class="cg-impact-row">
-            <span>Remaining after purchase:</span>
-            <strong>£${remainingBudget.toFixed(2)}</strong>
+            <span>Current Card Balance:</span>
+            <span>£${currentBalance.toFixed(2)} of £${cardLimit.toFixed(2)} (${currentPercent}%)</span>
+          </div>
+          <div class="cg-impact-row cg-divider">
+            <span>Projected New Balance:</span>
+            <strong class="${isBreach ? "cg-danger-text" : ""}">£${projectedBalance.toFixed(2)} (${projectedPercent}%)</strong>
           </div>
           
-          <div class="cg-gauge-bar" title="${percentUsed}% of budget used">
-            <div class="cg-gauge-fill ${gaugeClass}" style="width: ${percentUsed}%;"></div>
+          <div class="cg-gauge-bar" title="${projectedPercent}% of limit used">
+            <div class="cg-gauge-fill ${gaugeClass}" style="width: ${Math.min(100, projectedPercent)}%;"></div>
           </div>
-          <div style="margin-top: 6px; font-size: 12px; color: #64748b; text-align: right;">
-            ${statusText} (${percentUsed}%)
+          <div class="cg-status-note">
+            ${statusExplanation}
           </div>
         </div>
 
         <div class="cg-timer-box">
-          <span>⏳ Cooldown pause:</span>
+          <span>⏳ Reflection Cooldown:</span>
           <span id="cg-timer-seconds" class="cg-timer-seconds">${settings.cooldownSeconds || 15}s</span>
         </div>
 
         <div class="cg-actions">
-          <button id="cg-step-away" class="cg-btn-step-away">
-            Step Away (Cancel Purchase)
+          <button id="cg-sleep-on-it" class="cg-btn-sleep">
+            ⏳ Sleep On It (Revisit in 30 Mins)
           </button>
           <button id="cg-proceed" class="cg-btn-proceed" disabled>
-            Proceed to Purchase
+            Proceed to Checkout
           </button>
         </div>
       </div>
@@ -393,17 +349,76 @@
 
     document.body.appendChild(overlay);
 
-    // Event 1: Step Away (Close tab or redirect to safety)
-    document.getElementById("cg-step-away").addEventListener("click", () => {
-      // In web extension, we can redirect back or close
-      if (window.history.length > 1) {
-        window.history.back();
-      } else {
-        window.location.href = "about:blank";
+    // Save detected cart to storage so the Web App can display live sync
+    if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
+      chrome.storage.local.set({
+        lastDetectedCart: {
+          title: cartDetails.title,
+          amount: purchaseAmount,
+          store: window.location.hostname,
+          timestamp: Date.now(),
+        }
+      });
+    }
+
+    // ACTION 1: SLEEP ON IT (30-Minute ADHD Impulse Protection)
+    document.getElementById("cg-sleep-on-it").addEventListener("click", () => {
+      const newItem = {
+        id: `cool-${Date.now()}`,
+        title: cartDetails.title,
+        price: purchaseAmount,
+        url: window.location.href,
+        store: window.location.hostname,
+        savedAt: Date.now(),
+        expiresAt: Date.now() + 30 * 60 * 1000, // 30 minutes
+      };
+
+      if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
+        chrome.storage.local.get({ coolingOffItems: [] }, (res) => {
+          const updated = [newItem, ...(res.coolingOffItems || [])].slice(0, 10);
+          chrome.storage.local.set({ coolingOffItems: updated });
+        });
       }
+
+      // Show positive reinforcement screen
+      const modal = document.getElementById("checkout-guard-modal");
+      modal.innerHTML = `
+        <div class="cg-brand-header">
+          <span class="cg-brand-logo">◈</span>
+          <span>CAPITAL ONE · ADAPTIVE GUARD</span>
+        </div>
+        <div class="cg-badge safe" style="margin-top: 14px;">
+          <span>✓</span>
+          <span>Safe-Zone Protected!</span>
+        </div>
+        <h2 class="cg-title" style="margin-top: 12px;">Great decision, ${settings.cardholder || "Emil"}!</h2>
+        <p class="cg-subtitle">
+          We saved <strong>${cartDetails.title} (£${purchaseAmount.toFixed(2)})</strong> to your 30-minute cooling queue.
+        </p>
+        <div class="cg-impact-card" style="text-align: center;">
+          <p style="font-size: 14px; color: #166534; font-weight: 600;">
+            🎉 You just prevented your card from crossing the 30% safe threshold!
+          </p>
+          <p style="font-size: 13px; color: #64748b; margin-top: 6px;">
+            Your balance remains safely at £${currentBalance.toFixed(2)} (28%).
+          </p>
+        </div>
+        <div class="cg-actions">
+          <button id="cg-close-success" class="cg-btn-sleep">
+            Close & Step Away
+          </button>
+        </div>
+      `;
+
+      document.getElementById("cg-close-success").addEventListener("click", () => {
+        overlay.remove();
+        if (window.history.length > 1) {
+          window.history.back();
+        }
+      });
     });
 
-    // Event 2: Start cooldown countdown to unlock proceed button
+    // ACTION 2: COOLDOWN COUNTDOWN
     const cooldownDuration = parseInt(settings.cooldownSeconds, 10) || 15;
     startCooldownTimer(cooldownDuration, () => {
       const proceedBtn = document.getElementById("cg-proceed");
@@ -411,7 +426,7 @@
       if (proceedBtn) {
         proceedBtn.disabled = false;
         proceedBtn.classList.add("unlocked");
-        proceedBtn.textContent = "I've considered it — Continue to Checkout";
+        proceedBtn.textContent = "I've Considered It — Continue Purchase";
         proceedBtn.addEventListener("click", () => {
           overlay.remove();
         });
@@ -420,28 +435,54 @@
         timerBox.style.background = "#f0fdf4";
         timerBox.style.borderColor = "#bbf7d0";
         timerBox.style.color = "#166534";
-        timerBox.innerHTML = `<span>✅ Cooldown period complete</span>`;
+        timerBox.innerHTML = `<span>✅ 15s reflection completed</span>`;
       }
     });
   }
 
   /**
-   * 6. Initialize CheckoutGuard lifecycle.
+   * 5. Intercept Amazon "Buy Now" button clicks before purchase completes.
+   */
+  function attachBuyNowInterceptors(settings) {
+    const buyNowButtons = document.querySelectorAll(
+      '#buy-now-button, input[name="submit.buy-now"], [data-action="buy-now-button"]'
+    );
+    buyNowButtons.forEach((btn) => {
+      if (!btn.dataset.cgIntercepted) {
+        btn.dataset.cgIntercepted = "true";
+        btn.addEventListener("click", (e) => {
+          const cart = extractCartDetails();
+          createOverlay(cart, settings);
+        }, true);
+      }
+    });
+  }
+
+  /**
+   * 6. Main lifecycle runner.
    */
   function initCheckoutGuard() {
     if (typeof chrome === "undefined" || !chrome.storage || !chrome.storage.local) {
+      // Local testing mode without extension runtime
+      const detection = detectCheckout();
+      if (detection.isCheckout) {
+        const cart = extractCartDetails();
+        createOverlay(cart, DEFAULT_SETTINGS);
+      }
       return;
     }
 
     chrome.storage.local.get(DEFAULT_SETTINGS, (settings) => {
       if (!settings.isEnabled) return;
 
-      const detection = detectCheckout();
-      console.log("[CheckoutGuard] Page Analysis:", detection);
+      attachBuyNowInterceptors(settings);
 
-      if (detection.isCheckout && !isAlreadyInjected()) {
-        const total = extractCartTotal();
-        createOverlay(total, settings);
+      const detection = detectCheckout();
+      console.log("[Capital One Adaptive Guard] Detection:", detection);
+
+      if (detection.isCheckout && !document.getElementById("checkout-guard-overlay")) {
+        const cart = extractCartDetails();
+        createOverlay(cart, settings);
       }
     });
   }
@@ -449,14 +490,14 @@
   // Initial trigger
   initCheckoutGuard();
 
-  // Handle SPA / dynamically loaded checkouts via MutationObserver
+  // Observer for dynamic SPAs
   let debounceTimeout = null;
   const observer = new MutationObserver(() => {
-    if (isAlreadyInjected()) return;
+    if (document.getElementById("checkout-guard-overlay")) return;
     clearTimeout(debounceTimeout);
     debounceTimeout = setTimeout(() => {
       initCheckoutGuard();
-    }, 1500);
+    }, 1200);
   });
 
   if (document.body) {

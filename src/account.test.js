@@ -1,9 +1,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { initial, pence, gauge, runPayment } from './account.js';
+import {
+  initial,
+  pence,
+  gauge,
+  runPayment,
+  generateSupportDraft,
+  removeCoolingItem,
+} from './account.js';
 
 test('purchase preview is pure and handles the target and half-limit boundaries', () => {
   const state = initial();
+  assert.equal(state.cardholder, 'Emil');
   assert.equal(
     gauge(state.balance, state.limit, state.target).label,
     'Within your target',
@@ -58,4 +66,35 @@ test('paused, stale, unavailable and failed checks cannot deduct money', () => {
       [28000, 7500, 2500],
     );
   }
+});
+
+test('assisted support draft generates authentic message with user parameters', () => {
+  const draft = generateSupportDraft({
+    cardholder: 'Emil',
+    reasonKey: 'unexpected_expense',
+    amountAffordable: 1000,
+    minimum: 2500,
+    due: '14 November',
+    recoveryDate: '1 December',
+  });
+
+  assert.match(draft, /Dear Capital One Support Team/);
+  assert.match(draft, /essential unexpected repair/);
+  assert.match(draft, /statement minimum of £25\.00 due on 14 November/);
+  assert.match(draft, /able to pay £10\.00 right now/);
+  assert.match(draft, /stabilize by 1 December/);
+  assert.match(draft, /Yours faithfully,\nEmil/);
+});
+
+test('removing cooling items updates impulse savings and leaves queue clean', () => {
+  const state = initial();
+  assert.equal(state.coolingItems.length, 1);
+  assert.equal(state.impulseSavings, 0);
+
+  const updated = removeCoolingItem(state, 'cool-001');
+  assert.equal(updated.coolingItems.length, 0);
+  assert.equal(updated.impulseSavings, 6999); // £69.99 saved
+
+  // Removing non-existent item is a no-op
+  assert.equal(removeCoolingItem(updated, 'invalid-id'), updated);
 });

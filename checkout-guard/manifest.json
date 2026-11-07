@@ -1,15 +1,15 @@
 {
   "manifest_version": 3,
-  "name": "CheckoutGuard - Spending Friction & Impulse Shield",
+  "name": "Capital One Adaptive Guard - Overspend & Impulse Shield",
   "version": "1.0.0",
-  "description": "Protects against impulse overspending with automated checkout detection, budget impact preview, and reflection cooldowns.",
+  "description": "Protects Emil and neurodivergent cardholders against impulse overspending with automated checkout detection, credit safe-zone preview, and 30-minute reflection cooldowns.",
   "permissions": [
     "storage",
     "activeTab"
   ],
   "action": {
     "default_popup": "popup.html",
-    "default_title": "CheckoutGuard Settings"
+    "default_title": "Capital One Adaptive Guard"
   },
   "content_scripts": [
     {
