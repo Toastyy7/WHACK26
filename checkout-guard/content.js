@@ -4,12 +4,13 @@
  */
 
 (function () {
-  const DEFAULT_SETTINGS = {
-    isEnabled: true,
-    monthlyBudget: 300,
-    currentSpent: 120,
-    cooldownSeconds: 15,
-  };
+  const guard = globalThis.CheckoutGuard;
+  if (!guard?.available()) return;
+  let settings;
+  let dismissedCheckout = null;
+  let active = null;
+  let refreshTimer = null;
+  let loadVersion = 0;
 
   /**
    * Helper: Check if an element is genuinely rendered and visible on screen.
@@ -18,6 +19,7 @@
    */
   function isElementVisible(el) {
     if (!el || !(el instanceof HTMLElement)) return false;
+    if (el.closest('#checkout-guard-overlay')) return false;
     const style = window.getComputedStyle(el);
     if (style.display === "none" || style.visibility === "hidden" || style.opacity === "0") {
       return false;
@@ -35,12 +37,12 @@
     const pathname = window.location.pathname.toLowerCase();
 
     const nonEcommerceHosts = [
-      "google.", "bing.", "duckduckgo.", "yahoo.", "baidu.",
       "youtube.com", "github.com", "gitlab.com", "stackoverflow.com",
       "wikipedia.org", "reddit.com", "twitter.com", "x.com", "linkedin.com",
       "facebook.com", "instagram.com", "netflix.com", "medium.com"
     ];
-    if (nonEcommerceHosts.some((host) => hostname.includes(host))) {
+    if (/^(?:www\.)?(?:google|bing|duckduckgo|yahoo|baidu)\.[a-z.]+$/.test(hostname) ||
+        nonEcommerceHosts.some((host) => hostname === host || hostname.endsWith('.' + host))) {
       return true;
     }
 
@@ -71,13 +73,7 @@
     // Normal Amazon browsing includes search bars, product buy boxes, and nav carts.
     // We only trigger when the user has actually entered the final checkout funnel.
     // =========================================================================
-    if (hostname.includes("amazon.")) {
-      // 1. Browsing indicators on Amazon
-      const isAmazonBrowsing = !!document.querySelector(
-        '#add-to-cart-button, #buy-now-button, #twotabsearchtextbox, #nav-search-bar-form, ' +
-        '#s-results-list-atf, .s-search-results, #sc-active-cart, #nav-cart'
-      );
-
+    if (/(^|\.)amazon\.[a-z.]+$/.test(hostname)) {
       // 2. Strict Amazon Checkout indicators
       const isAmazonCheckoutUrl = /\/(gp\/buy|checkout\/spc|buy\/spc|buy\/payselect|gp\/checkout)\//i.test(pathname);
       const hasAmazonPlaceOrderBtn = Array.from(
@@ -91,11 +87,6 @@
           '#spc-orders, #subtotals-marketplace-table, .spc-desktop, #checkout-display-desktop, #spc-top'
         )
       ).some(isElementVisible);
-
-      // If browsing elements are present and the place order button is NOT present, stay quiet!
-      if (isAmazonBrowsing && !hasAmazonPlaceOrderBtn) {
-        return { isCheckout: false, score: 0, signals: ["AMAZON_BROWSING_EXCLUDED"] };
-      }
 
       // Only fire if inside the true Amazon purchase funnel
       if (hasAmazonPlaceOrderBtn || (isAmazonCheckoutUrl && hasAmazonCheckoutHeader)) {
@@ -116,21 +107,6 @@
     const signals = [];
     const activeCategories = new Set();
 
-    const buttons = Array.from(
-      document.querySelectorAll("button, input[type='submit'], a.button, [role='button']")
-    ).filter(isElementVisible);
-
-    // Guardrail: Product page with "Add to Cart" or "Add to Bag"
-    const hasAddToCart = buttons.some((btn) => {
-      const text = (btn.innerText || btn.value || "").trim().toLowerCase();
-      return /^(add to (cart|bag|basket)|pre-order now)/i.test(text);
-    });
-
-    // Guardrail: Generic site-wide search box
-    const hasSearchInput = Array.from(
-      document.querySelectorAll('input[type="search"], input[name="q"], input[name="search"]')
-    ).some(isElementVisible);
-
     // Category 1: Explicit E-Commerce Checkout Form / Step Containers (+5 pts)
     const checkoutContainers = [
       'form.woocommerce-checkout',
@@ -139,6 +115,7 @@
       '.step[data-step]',
       '[data-checkout-step]',
       '#checkout-step-payment',
+      '[data-testid="onepage-pay-button-cluster"]',
       '.opc-wrapper-opc',
       '#payment-form'
     ];
@@ -178,7 +155,10 @@
       'input[name="cvc" i]',
       '.StripeElement',
       'iframe[src*="js.stripe.com/v3/elements"]',
-      'iframe[src*="paypal.com/smart/buttons"]'
+      'iframe[src*="paypal.com/smart/buttons"]',
+      'iframe[src^="https://checkout.pci.shopifyinc.com/"]',
+      'iframe[src^="https://checkout.shopifycs.com/"]',
+      'iframe[name^="card-fields-"]'
     ];
     const visiblePaymentFields = Array.from(
       document.querySelectorAll(strictPaymentSelectors.join(", "))
@@ -190,8 +170,30 @@
       activeCategories.add("PAYMENT");
     }
 
+    // Without a route, checkout container or payment field, the remaining
+    // action/summary signals can score at most 7. Avoid layout reads on every button.
+    if (!hasCheckoutContainer && !isCheckoutPath && visiblePaymentFields.length === 0) {
+      return { isCheckout: false, score, signals };
+    }
+
+    const buttons = Array.from(
+      document.querySelectorAll("button, input[type='submit'], a.button, [role='button']")
+    ).filter(isElementVisible);
+
+    // Guardrail: Product page with "Add to Cart" or "Add to Bag"
+    const hasAddToCart = buttons.some((btn) => {
+      const text = (btn.innerText || btn.value || "").trim().toLowerCase();
+      return /^(add to (cart|bag|basket)|pre-order now)/i.test(text);
+    });
+
+    // Guardrail: Generic site-wide search box
+    const hasSearchInput = Array.from(
+      document.querySelectorAll('input[type="search"], input[name="q"], input[name="search"]')
+    ).some(isElementVisible);
+
     // Category 4: High-Intent Final Order Action Buttons (+5 pts)
     const finalCheckoutBtn = buttons.find((btn) => {
+      if (btn.id === 'checkout-pay-button') return true;
       const text = (btn.innerText || btn.value || "").trim().toLowerCase();
       return /^(place order|complete purchase|pay now|submit order|pay with card|confirm (and|&) pay|authorize payment)/i.test(text);
     });
@@ -245,225 +247,246 @@
    * @returns {number | null}
    */
   function extractCartTotal() {
-    // Specific standard selectors & platform-specific total elements (including Amazon)
-    const totalSelectors = [
-      '[data-checkout-total]',
-      '#order-total',
-      '.order-total',
-      '.cart-total',
-      '.checkout-total',
-      '[data-test="total-amount"]',
-      '#subtotals-marketplace-table .grand-total-price',
-      '.spc-order-summary .a-color-price',
-      'td.grand-total-price',
-      '#orderSummary .grand-total-price'
+    const selectors = [
+      '[data-checkout-total]', '#order-total', '.order-total', '.checkout-total',
+      '[data-test="total-amount"]', '#subtotals-marketplace-table .grand-total-price',
+      'td.grand-total-price', '#orderSummary .grand-total-price',
+      '#checkout-pay-button',
     ];
-
-    for (const selector of totalSelectors) {
-      const el = document.querySelector(selector);
-      if (el && el.innerText) {
-        const match = el.innerText.match(/[$£€]\s*([0-9]+(?:\.[0-9]{2})?)/);
-        if (match) return parseFloat(match[1]);
+    for (const selector of selectors) {
+      for (const element of document.querySelectorAll(selector)) {
+        if (!isElementVisible(element)) continue;
+        // An explicit total in a different currency must never fall back to a GBP item price.
+        return guard.parseGbp(element.innerText);
       }
     }
-
-    // General regex scan across summary or bold elements
-    const elements = document.querySelectorAll('strong, b, span, p, td');
-    for (const el of elements) {
-      const text = el.innerText || "";
-      if (/total/i.test(text) && /[$£€]/.test(text)) {
-        const match = text.match(/[$£€]\s*([0-9]+(?:\.[0-9]{2})?)/);
-        if (match) {
-          const val = parseFloat(match[1]);
-          if (val > 0 && val < 50000) return val;
-        }
+    for (const element of document.querySelectorAll('strong, b, span, p, td')) {
+      if (!isElementVisible(element)) continue;
+      const text = element.innerText.trim();
+      if (/^(?:grand\s+total|order\s+total|estimated\s+total|total(?:\s+due)?)[\s:]/i.test(text)) {
+        const amount = guard.parseGbp(text);
+        if (amount !== null) return amount;
       }
     }
-
     return null;
   }
 
-  /**
-   * 3. Check if the modal overlay is already mounted.
-   * @returns {boolean}
-   */
-  function isAlreadyInjected() {
-    return !!document.getElementById("checkout-guard-overlay");
-  }
+  const signature = (total) => `${location.href}|${total}`;
 
-  /**
-   * 4. Enforce the countdown friction timer before purchase can proceed.
-   * @param {number} durationSeconds
-   * @param {function} onComplete
-   */
-  function startCooldownTimer(durationSeconds, onComplete) {
-    let remaining = durationSeconds;
-    const timerDisplay = document.getElementById("cg-timer-seconds");
+  function createOverlay(total, checkoutSignature) {
+    const previousFocus = document.activeElement;
+    const overlay = document.createElement('div');
+    overlay.id = 'checkout-guard-overlay';
+    overlay.innerHTML = `
+      <section id="checkout-guard-modal" role="dialog" aria-modal="true" aria-labelledby="cg-modal-title" aria-describedby="cg-description" tabindex="-1">
+        <button type="button" id="cg-close" aria-label="Close preview">×</button>
+        <div class="cg-badge">🛡️ CheckoutGuard</div>
+        <h2 id="cg-modal-title" class="cg-title">Take a breath before you buy</h2>
+        <p id="cg-description" class="cg-subtitle">A quick look at how this order affects your monthly budget. This preview does not record a purchase.</p>
+        <div class="cg-impact-card">
+          <div class="cg-impact-row"><span id="cg-order-label">Detected order:</span><strong id="cg-order-amount"></strong></div>
+          <div id="cg-manual" hidden>
+            <label for="cg-purchase-input">Purchase amount (£)</label>
+            <input id="cg-purchase-input" inputmode="decimal" autocomplete="off" aria-describedby="cg-amount-note">
+            <p id="cg-amount-note">We couldn't read a GBP order total. Enter it above to preview; other currencies need conversion to pounds.</p>
+          </div>
+          <div class="cg-impact-row"><span>Already spent:</span><span id="cg-current-spent"></span></div>
+          <div class="cg-impact-row"><span>Remaining after purchase:</span><strong id="cg-remaining"></strong></div>
+          <div class="cg-gauge-bar" role="meter" aria-label="Projected monthly budget used" aria-valuemin="0" aria-valuemax="100"><div class="cg-gauge-fill"></div></div>
+          <p id="cg-budget-status" role="status"></p>
+        </div>
+        <div class="cg-timer-box"><span id="cg-timer-label">Reflection pause:</span><span id="cg-timer-seconds" class="cg-timer-seconds" role="timer" aria-live="off"></span></div>
+        <div id="cg-timer-status" role="status" class="cg-visually-hidden"></div>
+        <div class="cg-actions">
+          <button type="button" id="cg-step-away" class="cg-btn-step-away">Leave checkout</button>
+          <button type="button" id="cg-proceed" class="cg-btn-proceed" disabled>Continue to checkout</button>
+        </div>
+        <p class="cg-footnote">Close or press Escape to dismiss this preview. Leaving does not cancel an order already placed.</p>
+      </section>`;
+    const find = (selector) => overlay.querySelector(selector);
+    const modal = find('#checkout-guard-modal');
+    const deadline = Date.now() + settings.cooldownSeconds * 1000;
+    let interval;
+    let manualAmount = null;
+    let lastRender = '';
+    const amountInput = find('#cg-purchase-input');
+    find('#cg-manual').hidden = total !== null;
 
-    if (!timerDisplay) return;
-
-    timerDisplay.textContent = `${remaining}s`;
-
-    const interval = setInterval(() => {
-      remaining -= 1;
-      if (remaining > 0) {
-        timerDisplay.textContent = `${remaining}s`;
+    function render() {
+      const renderKey = JSON.stringify([settings.monthlyBudget, settings.currentSpent, manualAmount, amountInput.value]);
+      if (renderKey === lastRender) return;
+      lastRender = renderKey;
+      const purchase = total ?? manualAmount;
+      find('#cg-order-label').textContent = total === null ? 'Entered amount:' : 'Detected order:';
+      find('#cg-order-amount').textContent = purchase === null ? 'Not available' : guard.money(purchase);
+      find('#cg-current-spent').textContent = `${guard.money(guard.pence(settings.currentSpent))} of ${guard.money(guard.pence(settings.monthlyBudget))}`;
+      const meter = find('.cg-gauge-bar');
+      const fill = find('.cg-gauge-fill');
+      if (purchase === null) {
+        find('#cg-remaining').textContent = 'Not available';
+        fill.style.width = '0%';
+        fill.className = 'cg-gauge-fill';
+        meter.setAttribute('aria-valuenow', '0');
+        meter.setAttribute('aria-valuetext', 'Enter a GBP purchase amount to calculate the preview.');
+        find('#cg-budget-status').textContent = amountInput.value
+          ? 'Enter a non-negative amount with up to two decimal places.'
+          : 'Enter a GBP total to see its impact.';
       } else {
-        clearInterval(interval);
-        onComplete();
+        const result = guard.impact(settings, purchase);
+        find('#cg-remaining').textContent = guard.money(result.remaining);
+        fill.className = `cg-gauge-fill ${result.zone}`;
+        fill.style.width = `${result.width}%`;
+        meter.setAttribute('aria-valuenow', String(result.width));
+        meter.setAttribute('aria-valuetext', `${guard.percent(result.percentage)} used. ${result.label}`);
+        find('#cg-budget-status').textContent = `${result.label} (${guard.percent(result.percentage)} used)`;
       }
-    }, 1000);
-  }
-
-  /**
-   * 5. Construct and mount the behavioral friction modal.
-   * @param {number | null} cartTotal
-   * @param {object} settings
-   */
-  function createOverlay(cartTotal, settings) {
-    if (isAlreadyInjected()) return;
-
-    const overlay = document.createElement("div");
-    overlay.id = "checkout-guard-overlay";
-
-    const budget = Number(settings.monthlyBudget) || 300;
-    const spent = Number(settings.currentSpent) || 0;
-    const purchaseAmount = cartTotal !== null ? cartTotal : 35.00; // sensible fallback
-    const projectedSpent = spent + purchaseAmount;
-    const remainingBudget = Math.max(0, budget - projectedSpent);
-    const percentUsed = Math.min(100, Math.round((projectedSpent / budget) * 100));
-
-    let gaugeClass = "";
-    let statusText = "Within healthy budget";
-    if (percentUsed >= 80 && percentUsed <= 100) {
-      gaugeClass = "warning";
-      statusText = "Approaching spending limit";
-    } else if (percentUsed > 100) {
-      gaugeClass = "danger";
-      statusText = "Exceeds monthly target!";
     }
 
-    overlay.innerHTML = `
-      <div id="checkout-guard-modal" role="dialog" aria-modal="true" aria-labelledby="cg-modal-title">
-        <div class="cg-badge">
-          <span>🛑</span>
-          <span>Impulse Shield Active</span>
-        </div>
-        
-        <h2 id="cg-modal-title" class="cg-title">Take a Breath Before You Buy</h2>
-        <p class="cg-subtitle">Checkout detected. Here is how this purchase changes your balance:</p>
+    function close(dismiss = false) {
+      if (dismiss) dismissedCheckout = checkoutSignature;
+      clearInterval(interval);
+      document.removeEventListener('keydown', onKey, true);
+      document.removeEventListener('focusin', onFocus, true);
+      overlay.remove();
+      active = null;
+      if (previousFocus instanceof HTMLElement && previousFocus.isConnected) previousFocus.focus();
+    }
 
-        <div class="cg-impact-card">
-          <div class="cg-impact-row">
-            <span>Detected Order:</span>
-            <strong>£${purchaseAmount.toFixed(2)}</strong>
-          </div>
-          <div class="cg-impact-row">
-            <span>Current Spent:</span>
-            <span>£${spent.toFixed(2)} of £${budget.toFixed(2)}</span>
-          </div>
-          <div class="cg-impact-row">
-            <span>Remaining after purchase:</span>
-            <strong>£${remainingBudget.toFixed(2)}</strong>
-          </div>
-          
-          <div class="cg-gauge-bar" title="${percentUsed}% of budget used">
-            <div class="cg-gauge-fill ${gaugeClass}" style="width: ${percentUsed}%;"></div>
-          </div>
-          <div style="margin-top: 6px; font-size: 12px; color: #64748b; text-align: right;">
-            ${statusText} (${percentUsed}%)
-          </div>
-        </div>
+    function focusable() {
+      return [...overlay.querySelectorAll('button:not(:disabled), input')].filter((el) => !el.closest('[hidden]'));
+    }
+    function onKey(event) {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        event.stopPropagation();
+        close(true);
+      } else if (event.key === 'Tab') {
+        const items = focusable();
+        const first = items[0];
+        const last = items[items.length - 1];
+        if (event.shiftKey && (document.activeElement === first || document.activeElement === modal)) {
+          event.preventDefault(); last.focus();
+        } else if (!event.shiftKey && (document.activeElement === last || document.activeElement === modal)) {
+          event.preventDefault(); first.focus();
+        }
+      }
+    }
+    function onFocus(event) {
+      if (!overlay.contains(event.target)) modal.focus();
+    }
 
-        <div class="cg-timer-box">
-          <span>⏳ Cooldown pause:</span>
-          <span id="cg-timer-seconds" class="cg-timer-seconds">${settings.cooldownSeconds || 15}s</span>
-        </div>
+    function tick() {
+      const remaining = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+      find('#cg-timer-seconds').textContent = remaining ? `${remaining}s` : 'Complete';
+      if (!remaining) {
+        clearInterval(interval);
+        find('#cg-proceed').disabled = false;
+        find('#cg-proceed').classList.add('unlocked');
+        find('#cg-timer-status').textContent = 'Reflection pause complete. You can continue to checkout.';
+      }
+    }
 
-        <div class="cg-actions">
-          <button id="cg-step-away" class="cg-btn-step-away">
-            Step Away (Cancel Purchase)
-          </button>
-          <button id="cg-proceed" class="cg-btn-proceed" disabled>
-            Proceed to Purchase
-          </button>
-        </div>
-      </div>
-    `;
-
+    amountInput.addEventListener('input', () => {
+      manualAmount = guard.pence(amountInput.value);
+      amountInput.setAttribute('aria-invalid', String(amountInput.value !== '' && manualAmount === null));
+      render();
+    });
+    find('#cg-close').addEventListener('click', () => close(true));
+    find('#cg-proceed').addEventListener('click', () => {
+      if (Date.now() >= deadline) close(true);
+    });
+    find('#cg-step-away').addEventListener('click', () => {
+      close(true);
+      if (window.history.length > 1) window.history.back();
+      else window.location.assign('about:blank');
+    });
+    render();
     document.body.appendChild(overlay);
-
-    // Event 1: Step Away (Close tab or redirect to safety)
-    document.getElementById("cg-step-away").addEventListener("click", () => {
-      // In web extension, we can redirect back or close
-      if (window.history.length > 1) {
-        window.history.back();
-      } else {
-        window.location.href = "about:blank";
-      }
-    });
-
-    // Event 2: Start cooldown countdown to unlock proceed button
-    const cooldownDuration = parseInt(settings.cooldownSeconds, 10) || 15;
-    startCooldownTimer(cooldownDuration, () => {
-      const proceedBtn = document.getElementById("cg-proceed");
-      const timerBox = document.querySelector(".cg-timer-box");
-      if (proceedBtn) {
-        proceedBtn.disabled = false;
-        proceedBtn.classList.add("unlocked");
-        proceedBtn.textContent = "I've considered it — Continue to Checkout";
-        proceedBtn.addEventListener("click", () => {
-          overlay.remove();
-        });
-      }
-      if (timerBox) {
-        timerBox.style.background = "#f0fdf4";
-        timerBox.style.borderColor = "#bbf7d0";
-        timerBox.style.color = "#166534";
-        timerBox.innerHTML = `<span>✅ Cooldown period complete</span>`;
-      }
-    });
+    active = { overlay, signature: checkoutSignature, render, close };
+    document.addEventListener('keydown', onKey, true);
+    document.addEventListener('focusin', onFocus, true);
+    modal.focus();
+    interval = setInterval(tick, 250);
+    tick();
   }
 
-  /**
-   * 6. Initialize CheckoutGuard lifecycle.
-   */
-  function initCheckoutGuard() {
-    if (typeof chrome === "undefined" || !chrome.storage || !chrome.storage.local) {
+  function refresh() {
+    if (!settings) return;
+    if (settings.isEnabled && document.hidden && !active) return;
+    if (!settings.isEnabled || !detectCheckout().isCheckout) {
+      active?.close();
+      dismissedCheckout = null;
       return;
     }
-
-    chrome.storage.local.get(DEFAULT_SETTINGS, (settings) => {
-      if (!settings.isEnabled) return;
-
-      const detection = detectCheckout();
-      console.log("[CheckoutGuard] Page Analysis:", detection);
-
-      if (detection.isCheckout && !isAlreadyInjected()) {
-        const total = extractCartTotal();
-        createOverlay(total, settings);
-      }
-    });
+    const total = extractCartTotal();
+    const nextSignature = signature(total);
+    if (active && active.signature !== nextSignature) active.close();
+    if (active) active.render();
+    else if (dismissedCheckout !== nextSignature) createOverlay(total, nextSignature);
   }
 
-  // Initial trigger
-  initCheckoutGuard();
+  function scheduleRefresh() {
+    if (document.hidden && !active) return;
+    if (refreshTimer !== null) return;
+    refreshTimer = setTimeout(() => {
+      refreshTimer = null;
+      refresh();
+    }, 200);
+  }
 
-  // Handle SPA / dynamically loaded checkouts via MutationObserver
-  let debounceTimeout = null;
-  const observer = new MutationObserver(() => {
-    if (isAlreadyInjected()) return;
-    clearTimeout(debounceTimeout);
-    debounceTimeout = setTimeout(() => {
-      initCheckoutGuard();
-    }, 1500);
+  async function loadSettings() {
+    const version = ++loadVersion;
+    try {
+      const loaded = await guard.load();
+      if (version !== loadVersion) return;
+      settings = loaded;
+      refresh();
+    } catch (error) {
+      // A failed storage read must not replace someone's saved budget with a guess.
+      console.warn('[CheckoutGuard] Could not read settings:', error.message);
+    }
+  }
+
+  const observer = new MutationObserver((records) => {
+    if (document.hidden && !active) return;
+    if (active && !active.overlay.isConnected) {
+      active.close();
+      scheduleRefresh();
+      return;
+    }
+    if (records.some((record) => {
+      if (active?.overlay.contains(record.target)) return false;
+      const nodes = [...record.addedNodes, ...record.removedNodes];
+      if (nodes.length && nodes.every((node) => node.id === 'checkout-guard-overlay')) return false;
+      return true;
+    })) scheduleRefresh();
   });
-
-  if (document.body) {
-    observer.observe(document.body, { childList: true, subtree: true });
-  } else {
-    document.addEventListener("DOMContentLoaded", () => {
-      observer.observe(document.body, { childList: true, subtree: true });
-    });
-  }
+  observer.observe(document.documentElement, {
+    childList: true, subtree: true, characterData: true, attributes: true,
+    attributeFilter: ['class', 'style', 'hidden', 'aria-hidden'],
+  });
+  document.addEventListener('input', (event) => {
+    if (!active?.overlay.contains(event.target)) scheduleRefresh();
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) scheduleRefresh();
+  });
+  window.addEventListener('popstate', scheduleRefresh);
+  window.addEventListener('hashchange', scheduleRefresh);
+  // pushState/replaceState do not emit popstate. Watch the URL without modifying a site's history methods.
+  let lastUrl = location.href;
+  setInterval(() => {
+    if (location.href !== lastUrl) {
+      lastUrl = location.href;
+      scheduleRefresh();
+    }
+  }, 750);
+  window.addEventListener('pagehide', () => {
+    active?.close();
+    clearTimeout(refreshTimer);
+    refreshTimer = null;
+  });
+  window.addEventListener('pageshow', scheduleRefresh);
+  guard.subscribe(loadSettings);
+  loadSettings();
 })();
