@@ -1,0 +1,9 @@
+
+Chrome extension and web app:
+
+Monitors checkout pages visited, scrapes checkout details to keep a track of payments, would theoretically be integrated with capital ones own systems.
+
+Lets you know what zone in your credit utilisation you are e.g. green, red
+Lets you re-evaluate whether you actually need to make this purchase, or if you would like to revisit it in 30 minutes
+
+A way to help customers send a grace email, but not make it TOO low friction, and warn of the credit score effects so that this feature is not overutilised as this would hurt their credit score.
