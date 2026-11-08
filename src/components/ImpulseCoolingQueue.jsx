@@ -1,7 +1,8 @@
 import React from 'react';
 import { formatMoney } from '../utils/format.js';
 
-export default function ImpulseCoolingQueue({ items, savings, onDismiss, onAddSimulated }) {
+// `name` is the signed-in person's name, or null for a guest ("you" wording).
+export default function ImpulseCoolingQueue({ items, savings, onDismiss, onAddSimulated, name = null }) {
 
   function handleSaveItem(id) {
     onDismiss(id);
@@ -33,7 +34,7 @@ export default function ImpulseCoolingQueue({ items, savings, onDismiss, onAddSi
           <span aria-hidden="true" style={{ fontSize: '1.2rem' }}>🎉</span>
           <div>
             <strong>Total Impulse Money Saved: {formatMoney(savings)}</strong>
-            <p className="savings-subtext">Money kept in Emil's account by pausing and stepping away from impulsive buys.</p>
+            <p className="savings-subtext">Money kept in {name ? `${name}’s` : 'your'} account by pausing and stepping away from impulsive buys.</p>
           </div>
         </div>
       )}
@@ -42,7 +43,7 @@ export default function ImpulseCoolingQueue({ items, savings, onDismiss, onAddSi
         <div className="empty-cooling">
           <p style={{ margin: '0 0 4px', fontWeight: 600 }}>No items in your reflection queue right now.</p>
           <p className="muted" style={{ margin: '0 0 12px', fontSize: '0.85rem' }}>
-            When Emil shops online, the extension intercepts checkout and offers a 30-minute cooling pause.
+            When {name ? `${name} shops` : 'you shop'} online, the extension intercepts checkout and offers a 30-minute cooling pause.
           </p>
           <button type="button" className="secondary" onClick={handleAddMockItem}>
             + Simulate Extension Interception (£54.99 Tracker)

@@ -434,6 +434,7 @@ try:
 
             saved = site.get_by_text('Total Impulse Money Saved: £69.99')
             create('alice', 'alice password')
+            expect(site.get_by_role('heading', level=1)).to_have_text('Alice’s credit card')
             site.get_by_role('button', name=re.compile("I don't need this")).first.click()
             expect(saved).to_be_visible()
             log_out()
@@ -452,6 +453,7 @@ try:
             log_out()
             site.get_by_role('button', name='Continue without an account').click()
             expect(site.get_by_text('Guest', exact=True)).to_be_visible()
+            expect(site.get_by_role('heading', level=1)).to_have_text('Your credit card')
             web.close()
             print('PASS accounts: register, separate data per account, wrong password, log in again, session survives reload, log out, guest')
         finally:

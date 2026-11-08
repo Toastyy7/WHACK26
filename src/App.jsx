@@ -32,6 +32,8 @@ export default function App({ session = {} }) {
   const [statementKey, setStatementKey] = useState(0);
   const heading = useRef(null);
   const [account, setAccount] = useState(createInitialAccount);
+  // The signed-in person's name in titles ("Sam"); guests get "you" wording.
+  const name = session.user ? session.user.username.charAt(0).toUpperCase() + session.user.username.slice(1) : null;
   const month = useCurrentMonth();
   const adjustment = monthlyBalance(account.balance, savedStatement?.result.transactions ?? [], month);
   const displayedAccount = { ...account, balance: adjustment.balance };
@@ -104,7 +106,7 @@ export default function App({ session = {} }) {
       <div className="intro">
         <p className="eyebrow">CAPITAL ONE HACKATHON · SIMULATED ACCOUNT</p>
         <h1 ref={heading} tabIndex={-1}>
-          {{ home: 'Emil’s credit card', grace: 'Request Grace', statements: 'Statement analysis' }[page]}
+          {{ home: name ? `${name}’s credit card` : 'Your credit card', grace: 'Request Grace', statements: 'Statement analysis' }[page]}
         </h1>
         <p>{{ home: 'See what you owe and what you can do next.', grace: 'Send a written request and follow its progress.', statements: 'See where your money goes.' }[page]}</p>
       </div>
@@ -120,6 +122,7 @@ export default function App({ session = {} }) {
             savings={queue.savings}
             onDismiss={dismissCoolingItem}
             onAddSimulated={addCoolingItem}
+            name={name}
           />
           {savedStatement && <HomeSpendingSummary
             key={`${savedStatement.fileName}-${savedStatement.savedAt}`}
