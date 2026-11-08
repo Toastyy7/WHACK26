@@ -14,8 +14,18 @@
   let snapshot = null;
 
   async function applySnapshot() {
-    try { if (snapshot) await guard.applySnapshot(snapshot); }
-    catch (error) { console.warn('[CheckoutGuard] Dashboard numbers not applied:', error.message); }
+    const current = snapshot;
+    if (!current) return;
+    try {
+      // Heartbeats need no storage write when the numbers already match.
+      const settings = await guard.load();
+      if (guard.pence(settings.monthlyBudget) !== current.monthlyBudget ||
+          guard.pence(settings.currentSpent) !== current.currentSpent) {
+        await guard.applySnapshot(current);
+      }
+      window.postMessage({ source: 'checkout-guard-extension', type: 'snapshot-applied',
+        monthlyBudget: current.monthlyBudget, currentSpent: current.currentSpent }, location.origin);
+    } catch (error) { console.warn('[CheckoutGuard] Dashboard numbers not applied:', error.message); }
   }
 
   async function deliver() {
@@ -35,7 +45,7 @@
   window.addEventListener('message', async (event) => {
     if (event.source !== window || event.origin !== location.origin || event.data?.source !== 'credit-guard-dashboard') return;
     if (event.data.type === 'preferences') {
-      try { await guard.setFont(event.data.font); } catch (error) { console.warn('[CheckoutGuard] Font not applied:', error.message); }
+      try { if (await guard.getFont() !== event.data.font) await guard.setFont(event.data.font); } catch (error) { console.warn('[CheckoutGuard] Font not applied:', error.message); }
     } else if (event.data.type === 'reset') {
       try { await guard.clearApprovals(); } catch (error) { console.warn('[CheckoutGuard] Reset not applied:', error.message); }
     } else if (event.data.type === 'snapshot') {

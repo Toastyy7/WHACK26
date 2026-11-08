@@ -19,3 +19,11 @@ Then load `checkout-guard/` as an unpacked extension.
 | [project-brief.md](project-brief.md) | pitch, 90-second demo script, judge Q&A |
 
 **Rule:** never commit to `main`. Use a branch and a pull request (see REPO-FIX.md).
+
+### Local OCR and review before import
+
+JPG/PNG images and image-only PDF pages now use bundled, local OCR. Nothing is sent to an OCR service. `npm ci` followed by `npm run dev` prepares the required assets; rebuild `dist/` before using the offline demo.
+
+All uploads, including text PDFs and the sample statement, first open **Review before importing**. Correct dates, amounts and descriptions, choose existing categories, exclude unclear rows or add missing ones. Confirm the review checkbox, then import the selected rows. Until then Home and the balance stay unchanged. Cancel keeps the previous saved statement; Reset cancels reading and clears drafts and confirmed results.
+
+OCR is imperfect, especially for blurry images and template amounts. Incomplete pages, mismatches and all-zero results are flagged rather than filled in with invented transactions. Original images/PDFs are not saved. See `docs/LAUNCH.md` for limits and the OCR browser test.

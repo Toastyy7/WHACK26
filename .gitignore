@@ -18,3 +18,9 @@ playwright-report/
 
 # Personal editor settings
 .vscode/
+
+# Generated from locked npm packages before dev/build; copied into committed dist/.
+/public/ocr/
+
+# LibreOffice/OpenOffice files indicating an open document
+.~lock.*#

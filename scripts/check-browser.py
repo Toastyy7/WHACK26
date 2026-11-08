@@ -339,7 +339,19 @@ try:
         )
         real.on('page', lambda page: page.on('pageerror', lambda error: errors.append(str(error))))
         dash = real.new_page()
-        dash.goto(f'http://127.0.0.1:{dash_server.server_port}/')
+        # Simulate a missed first handshake. Sync must recover without a reload
+        # or an edit to the dashboard's demo controls.
+        dash.add_init_script('''
+          const started = Date.now();
+          window.addEventListener('message', event => {
+            if (Date.now() - started < 1000 &&
+                ['credit-guard-dashboard', 'checkout-guard-extension'].includes(event.data?.source)) {
+              event.stopImmediatePropagation();
+            }
+          }, true);
+        ''')
+        dash.goto(f'http://localhost:{dash_server.server_port}/')
+        expect(dash.get_by_role('status').filter(has_text='Extension connected')).to_be_visible(timeout=10000)
         dash_overview = dash.get_by_role('region', name='Account overview')
         expect(dash_overview).to_contain_text('£280')
         shop = real.new_page()

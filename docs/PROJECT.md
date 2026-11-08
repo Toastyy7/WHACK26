@@ -67,19 +67,20 @@ React 19 and Vite 7, with no router and no state library. `App.jsx` holds the sh
 | Try a purchase first | Type an amount to see "After this: £X safe to spend" or "£X over your safe limit". Never changes the account. | `SafeZoneGauge.jsx`, `PurchaseProjection.jsx` |
 | Reflection queue | Checkouts paused by the extension, kept for 30 minutes. "I don't need this" removes an item and adds it to **Total Impulse Money Saved**. | `ImpulseCoolingQueue.jsx`, `coolingQueue.js`, `hooks/useCoolingQueue.js` |
 | Request Grace | Draft → edit → review → disclaimer and consent → send → status updates. The decision is simulated at random and doesn't predict a real lender. | `RequestGrace.jsx`, `grace.js` |
-| Statement analysis | Upload a text-based GBP bank statement PDF (or load the demo statement). Rows are extracted locally, categorised and reconciled against the statement's own total. You can change categories, include/exclude rows and add transactions manually. | `StatementAnalysis.jsx`, `AddTransactionForm.jsx`, `statements/*` |
+| Statement analysis | Upload a GBP PDF, JPG or PNG (or load the demo statement). PDF text is used first; image/scanned pages use local OCR. Review and correct the extracted rows before confirming an import. Existing categories, include/exclude controls and manual transactions remain available. | `StatementAnalysis.jsx`, `AddTransactionForm.jsx`, `statements/*` |
 | Home spending summary | This month's saved transactions on Home, with Remove/restore. | `HomeSpendingSummary.jsx` |
 | Demo controls | Presenter-only: starting balance, credit limit, target %. | `DemoControls.jsx` |
 | ⚙ Settings, menu, reset | One Settings menu with switches for **Dark mode**, **Detailed view** and **Dyslexia-friendly font (OpenDyslexic)**, all remembered and kept across Reset demo. The font is bundled (works offline) and also switches the extension's popups. ☰ Menu for navigation; **Reset demo** clears everything else. | `SettingsMenu.jsx`, `NavigationMenu.jsx` |
 
 ### Statement import
 
-- PDF.js runs in the browser with its bundled worker. The file is read in memory and never uploaded or saved; only the extracted rows are saved.
+- PDF.js and Tesseract.js run in the browser with bundled workers, WASM and English language data. No statement or OCR request goes to a server/CDN. Files and draft review rows remain in memory; only confirmed rows are saved.
+- `npm run dev`, `start` and `build` prepare local OCR assets from the locked npm packages using `scripts/prepare-ocr.mjs`. Generated `public/ocr/` is ignored; the corresponding `dist/ocr/` is included in the offline build.
 - The importer finds separate outgoing/incoming columns ("Paid out/Paid in", "Money out/Money in", "Payments out/in", Nationwide's "£Out/£In", "Debit/Credit", "Withdrawals/Deposits") and uses each amount's position to skip incoming payments and running balances.
-- Limits: 20 MB, 100 pages, text PDFs only. Scanned, password-protected and non-GBP statements aren't supported.
-- A detected summary total is compared with the extracted total. A mismatch or missing total is shown for review. A match is a useful check, not a guarantee.
+- Limits: 20 MB per file, 100 PDF pages, up to 15 scanned pages requiring OCR. JPG/PNG images and mixed text/scanned PDFs are supported. Password-protected and non-GBP files are unsupported. OCR rescales to a bounded canvas, improves contrast and can separately read coloured table headers. It never infers outgoing amounts from balances.
+- A detected summary total is compared with the extracted total. Missing totals/pages, zero-value templates and mismatches are flagged. A match is a useful check, not a guarantee. OCR can miss or misread rows. The review form allows date, description, amount and category corrections, exclusion and missing-row additions; it requires explicit acknowledgement before saving. Cancel, refresh and Reset discard an unconfirmed draft. Existing saved transactions stay unchanged while reading/reviewing.
 - Dates use the printed year, or the statement period when the bank leaves the year out. They never silently use the current year.
-- Categories come from general keyword rules (`categories.js`). Anything unknown goes to **Other / needs review**.
+- Categories come from general keyword rules (`categories.js`), with cash/transfer payment-type hints. Fuel takes priority over supermarket names. Anything unknown goes to **Other / needs review**. No autonomous agent or remote model changes amounts or categories.
 
 ## CheckoutGuard extension
 
@@ -141,6 +142,7 @@ All messages are `window.postMessage` within the dashboard tab. Both sides check
 | dash → ext | `cooling-item-saved` `{id}` | As above. |
 | dash → ext | `preferences` `{font}` | Font choice (`default`/`dyslexic`). Both extension popups switch font. Sent on start-up and when it changes. |
 | dash → ext | `reset` | Reset demo was pressed. The extension forgets approved shops. |
+| ext → dash | `snapshot-applied` `{monthlyBudget, currentSpent}` | Confirms that the extension has applied the dashboard’s current values; drives the visible connection status. |
 | dash → ext | `snapshot` `{monthlyBudget, currentSpent}` (pence) | The extension takes these as its budget and spend. Sent on start-up and whenever they change. |
 
 Reliability:
@@ -151,6 +153,8 @@ Reliability:
 - If the dashboard is closed, items wait in the extension until it opens.
 
 The extension and dashboard each check incoming data with their own validators. The extension can't import from `src/`, so the checks are duplicated on purpose. `test/extension-contract.test.js` fails if the two copies ever disagree.
+
+The dashboard retries its ready/snapshot/preferences handshake every five seconds and on focus, so a lost startup message can recover. It shows **Extension connected · balance is synced** only after acknowledgement of the current numbers. After 15 seconds without confirmation, it shows **Extension not connected** with reload and site-access instructions. Heartbeats avoid writing unchanged extension settings.
 
 All of the dashboard's bridge code is in `src/hooks/useExtensionBridge.js`. To support a deployed dashboard, add its exact origin to the allowlist in `checkout-guard/sync.js`.
 
@@ -233,3 +237,7 @@ project-brief.md            pitch, demo script, judge Q&A
 - Sync needs the dashboard open on a localhost port in the same browser profile.
 - A shop approval is read when the page loads. If it expires while the page stays open, that's ignored until the next page load.
 - Temporary Firefox add-ons disappear on restart. A permanent install needs Mozilla signing.
+
+### OCR/review verification
+
+`python scripts/check-statement-ocr.py [optional-image-paths...]` uses the Playwright/Chromium setup from the browser suite. It generates a synthetic image and image-only PDF, verifies that cancelling never saves rows, corrects an amount before confirming, checks the current-month balance and Reset, and rejects external requests. Optional image paths are read locally and never copied into source control. Unit tests cover word-split headings/dates, In/Out order, date-year inference, categorisation and review validation. Poor scans still require manual correction; template totals are not treated as ground truth.
