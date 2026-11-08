@@ -88,6 +88,12 @@ It's removed when Firefox closes, so load it again next time.
 4. Wait for the timer, click **Continue to checkout**. The dashboard and both extension popups now say **Safe to spend £0.00** and "You owe £349.99 of your £300.00 safe limit". The popup stays away on that shop for 30 minutes.
 5. Or click **Leave checkout** instead. The item appears in the dashboard's 30-minute reflection queue.
 
+### See a purchase’s effect before spending
+
+On Home, enter a GBP amount in **Try a purchase first**. Valid input, including **0**, reveals **Now** and **After this purchase** gauges. Both use your chosen safe limit; text shows what you owe and what remains or is over the limit. This is a preview: it does not add a transaction or change the extension’s current balance.
+
+With Reset demo values (£280 owed, £300 safe limit), try **10** (£10 safe to spend), **20** (£0, amber/full), **20.01** (1p over, red/full) and **50** (£30 over). Bars stop at full; the overage is still written out. **Clear preview**, empty input or an invalid amount removes the comparison; Reset demo also clears the input. Choosing a different main balance number does not change what these gauges measure.
+
 ### Personalise the website and extension together
 
 Open **⚙ Settings** → **Main balance number** to choose Safe to spend, Card limit remaining or What you owe. In a fresh demo these are **£20.00**, **£720.00** and **£280.00**. The selection also applies to the extension toolbar and checkout’s before/after figures, saves automatically and survives Reset demo. It works with Advanced Mode off too. The safe-limit gauge and warnings stay visible whichever number you choose. If the extension says the full limit is unavailable, open the website in the same browser profile to sync it.

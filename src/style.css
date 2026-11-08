@@ -533,3 +533,15 @@ body:has(.settings-dialog[open]) { overflow: hidden; }
 .balance-explanation { font-size: 0.9rem; margin: 0; max-width: 42ch; }
 .balance-safe { margin: 4px 0; }
 .balance-headline { overflow-wrap: anywhere; }
+
+/* Same scale and status tokens as the account gauge; preview bars never animate. */
+.projection-comparison h3 { font-size: 1.05rem; }
+.projection-comparison > .muted { font-size: 0.9rem; }
+.projection-comparison-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 16px; }
+.projection-comparison-card { min-width: 0; padding: 16px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+.projection-comparison-card h4 { font-size: 1rem; margin: 0 0 12px; }
+.projection-comparison-card .gauge { margin: 0 0 12px; }
+.projection-current-status { font-size: 0.9rem; color: var(--muted); margin: 0; }
+@media (max-width: 600px) {
+  .projection-comparison-grid { grid-template-columns: 1fr; }
+}
