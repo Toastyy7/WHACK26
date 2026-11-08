@@ -72,6 +72,8 @@ It's removed when Firefox closes, so load it again next time.
 
 ### Personalise the website and extension together
 
+Open **⚙ Settings** → **Main balance number** to choose Safe to spend, Card limit remaining or What you owe. In a fresh demo these are **£20.00**, **£720.00** and **£280.00**. The selection also applies to the extension toolbar and checkout’s before/after figures, saves automatically and survives Reset demo. It works with Advanced Mode off too. The safe-limit gauge and warnings stay visible whichever number you choose. If the extension says the full limit is unavailable, open the website in the same browser profile to sync it.
+
 Open **⚙ Settings** on the website. The large centred dialog has the existing theme, font and Detailed view switches. Enable **Advanced Mode** for:
 
 - **Text size:** Standard, Larger or Largest.

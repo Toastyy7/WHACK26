@@ -53,6 +53,7 @@ export default function App() {
     receiveCoolingItem: addCoolingItem,
     font,
     displayPreferences: display,
+    cardLimit: account.limit,
   });
   // Changing this key tells React to recreate the panels and clear their local state.
   const [resetKey, setResetKey] = useState(0);
@@ -116,8 +117,8 @@ export default function App() {
       <div key={resetKey}>
         {/* Keep screens mounted so navigating home preserves the request and preview. */}
         <div hidden={page !== 'home'}>
-          <AccountOverview account={displayedAccount} detailed={view === 'detailed'} monthlyOutgoing={adjustment.outgoing} />
-          <SafeZoneGauge account={displayedAccount} />
+          <AccountOverview account={displayedAccount} detailed={view === 'detailed'} monthlyOutgoing={adjustment.outgoing} balanceFigure={display.balanceFigure} />
+          <SafeZoneGauge account={displayedAccount} balanceFigure={display.balanceFigure} />
           <ImpulseCoolingQueue
             items={queue.items}
             savings={queue.savings}

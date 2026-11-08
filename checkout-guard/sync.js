@@ -43,7 +43,7 @@
     } else if (event.data.type === 'reset') {
       try { await guard.clearApprovals(); } catch (error) { console.warn('[CheckoutGuard] Reset not applied:', error.message); }
     } else if (event.data.type === 'snapshot') {
-      snapshot = { monthlyBudget: event.data.monthlyBudget, currentSpent: event.data.currentSpent };
+      snapshot = { monthlyBudget: event.data.monthlyBudget, currentSpent: event.data.currentSpent, cardLimit: event.data.cardLimit };
       await applySnapshot();
     } else if (event.data.type === 'ready') {
       ready = true;
@@ -66,7 +66,7 @@
     if (!snapshot) return;
     try {
       const settings = await guard.load();
-      if (guard.pence(settings.monthlyBudget) !== snapshot.monthlyBudget || guard.pence(settings.currentSpent) !== snapshot.currentSpent) {
+      if (guard.pence(settings.monthlyBudget) !== snapshot.monthlyBudget || guard.pence(settings.currentSpent) !== snapshot.currentSpent || settings.cardLimit !== (snapshot.cardLimit ?? null)) {
         await applySnapshot();
       }
     } catch (error) { console.warn('[CheckoutGuard] Could not check dashboard numbers:', error.message); }

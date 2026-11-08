@@ -109,6 +109,23 @@ try:
         expect(overview).not_to_contain_text('%')  # simple view: no percentages
         settings = page.get_by_role('button', name='⚙ Settings')
         settings.click()
+        headline_choice = page.get_by_label('Main balance number')
+        for value, label, expected in [('card-remaining', 'Card limit remaining', '£720.00'), ('owed', 'What you owe', '£280.00')]:
+            headline_choice.select_option(value)
+            expect(overview.locator('.balance-headline')).to_contain_text(label + expected)
+            expect(overview.locator('.balance-safe')).to_contain_text('Safe to spend: £20.00')
+            expect(meter).to_have_attribute('aria-valuenow', '93')
+            page.keyboard.press('Escape')
+            amount.fill('50')
+            expect(projection).to_contain_text(label + ' after this: ' + ('£670.00' if value == 'card-remaining' else '£330.00'))
+            expect(projection).to_contain_text('£30.00 over your safe limit')
+            settings.click()
+        page.reload()
+        settings.click()
+        expect(headline_choice).to_have_value('owed')
+        headline_choice.select_option('safe-to-spend')
+        expect(overview.locator('.balance-safe')).to_have_count(0)
+        print('PASS main balance choice: card remaining £720.00, owed £280.00, default safe £20.00, unchanged gauge and reload persistence')
         view = page.get_by_role('switch', name='Detailed view')
         page.locator('.setting-title', has_text='Detailed view').click()  # clicking the words alone must toggle
         expect(view).to_be_checked()
@@ -233,6 +250,15 @@ try:
         assert checkout.locator('#checkout-guard-modal').evaluate('el => getComputedStyle(el).animationName') == 'none'
         assert checkout.locator('.cg-gauge-fill').evaluate('el => getComputedStyle(el).transitionDuration') == '0s'
         assert checkout.evaluate('getComputedStyle(document.body).backgroundColor') == original_shop_background
+        checkout.evaluate("display => window.__setSettings({'checkoutGuard.preferences': {...display, balanceFigure:'card-remaining'}, 'checkoutGuard.cardLimit': 100000})", display)
+        expect(checkout.locator('#cg-main-label')).to_have_text('Card limit remaining now:')
+        expect(checkout.locator('#cg-left-now')).to_have_text('£880.00')
+        expect(checkout.locator('#cg-remaining')).to_have_text('£810.01')
+        expect(checkout.locator('#cg-safe-context')).to_contain_text('Safe to spend now: £180.00')
+        checkout.evaluate("display => window.__setSettings({'checkoutGuard.preferences': {...display, balanceFigure:'owed'}})", display)
+        expect(checkout.locator('#cg-left-now')).to_have_text('£120.00')
+        expect(checkout.locator('#cg-remaining')).to_have_text('£189.99')
+        checkout.evaluate("display => window.__setSettings({'checkoutGuard.preferences': display})", display)
         print('PASS overlay preferences: live updates, larger text, spacing, dark theme, reduced motion, detailed view, host page unaffected')
         expect(checkout.locator('#cg-proceed')).to_be_enabled(timeout=3000)
         checkout.locator('#cg-proceed').click()
@@ -333,6 +359,13 @@ try:
         assert popup.locator('h1').evaluate('el => getComputedStyle(el).fontSize') == '23.75px'
         assert popup.locator('button').first.evaluate('el => getComputedStyle(el).minHeight') == '52px'
         expect(popup.locator('#extraDetail')).to_be_visible()
+        popup.evaluate("display => window.__setSettings({'checkoutGuard.preferences': {...display, balanceFigure:'card-remaining'}, 'checkoutGuard.cardLimit': 100000})", display)
+        expect(popup.locator('#balanceLabel')).to_have_text('Card limit remaining')
+        expect(popup.locator('#safeSummary')).to_be_visible()
+        popup.evaluate("window.__setSettings({'checkoutGuard.cardLimit': null})")
+        expect(popup.locator('#remainingAmount')).to_have_text('Not available')
+        expect(popup.locator('#balanceExplanation')).to_contain_text('Open the dashboard')
+        popup.evaluate("display => window.__setSettings({'checkoutGuard.preferences': display})", display)
         spent = popup.get_by_label('You owe (£)')
         budget = popup.get_by_label('Safe limit (£)')
         for spend, detail, remaining, zone in [('120', 'You owe £120.00 of your £300.00 safe limit.', '£180.00', 'safe'),
@@ -449,6 +482,16 @@ try:
         expect(shop.locator('#checkout-guard-overlay')).to_have_attribute('data-font', 'dyslexic', timeout=5000)
         assert 'OpenDyslexic' in shop.evaluate("getComputedStyle(document.querySelector('#cg-budget-status')).fontFamily")
         shop.wait_for_function("document.fonts.check('16px OpenDyslexic')", timeout=5000)  # really loaded from the extension
+        dash.get_by_label('Main balance number').select_option('card-remaining')
+        expect(toolbar.locator('#balanceLabel')).to_have_text('Card limit remaining')
+        expect(toolbar.locator('#remainingAmount')).to_have_text('£720.00')
+        expect(shop.locator('#cg-left-now')).to_have_text('£720.00')
+        expect(shop.locator('#cg-remaining')).to_have_text('£650.01')
+        expect(toolbar.locator('#safeSummary')).to_contain_text('£20.00')
+        dash.get_by_label('Main balance number').select_option('owed')
+        expect(toolbar.locator('#remainingAmount')).to_have_text('£280.00')
+        expect(shop.locator('#cg-remaining')).to_have_text('£349.99')
+        dash.get_by_label('Main balance number').select_option('safe-to-spend')
         dash.get_by_role('switch', name='Advanced Mode').check()
         dash.get_by_label('Text size', exact=False).select_option('extra-large')
         dash.get_by_role('switch', name='Comfortable spacing').check()

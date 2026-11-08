@@ -51,7 +51,7 @@ flowchart LR
 - **All amounts are integer pence** (`28000` = £280). Pounds only exist at the edges: typed input is parsed by `parsePoundsToPence` and displayed with `formatMoney`. No floating-point money maths.
 - **Balance = amount owed.** Purchases from this month (statement rows, manual entries, checkouts from the extension) are **added** to the starting balance, like spending on a real card. The what-if preview uses the same direction, so a £50 preview and a real £50 purchase show the same number. Removing a transaction undoes it.
 - **Only the current calendar month counts** (browser local time). Older months, unknown dates and removed rows are ignored. The total is recalculated each time from the transaction list, never kept as a running total, so a refresh can't double-count.
-- **One money model, one headline number: "Safe to spend".** The *safe limit* is the chosen target share of the card limit (30% of £1,000 = £300). *Safe to spend* = safe limit − what you owe (£300 − £280 = **£20.00**), never below £0; past it, the app says "£X over your safe limit". The dashboard, the checkout popup and the toolbar popup all use exactly these words and this maths (`getGaugeState` in `src/account.js`, `impact` in `checkout-guard/core.js`). `test/extension-contract.test.js` fails if they ever differ. Built for people with dyscalculia: no second figure to reconcile.
+- **One money model; Safe to spend is the default headline.** The *safe limit* is the chosen target share of the card limit (30% of £1,000 = £300). *Safe to spend* = safe limit − what you owe (£300 − £280 = **£20.00**), never below £0; past it, the app says "£X over your safe limit". The dashboard, the checkout popup and the toolbar popup all use exactly these words and this maths (`getGaugeState` in `src/account.js`, `impact` in `checkout-guard/core.js`). `test/extension-contract.test.js` fails if they ever differ. Optional headline choices do not change this model: Card limit remaining = full card limit − owed (clamped to zero); What you owe = current balance (clamped to zero). Non-default headlines keep Safe to spend visible. `test/display-contract.test.js` checks the same selected figures and definitions on both sides.
 - **No percentages in the default (Simple) view.** One bar (share of the safe limit used, never past full) plus words. Screen readers get the same words. Percentages appear only in the optional **Detailed view**.
 - **Colour bands, same on both sides:** green while you owe less than 80% of the safe limit ("Within your safe limit"), amber from 80% up to the limit ("Close to your safe limit"), red over it ("Over your safe limit"). The dashboard also says "Over your card limit" above the card limit. These are interface bands, **not** a credit-score prediction.
 - **Shared numbers:** the dashboard sends the extension its safe limit and what you owe. While a dashboard tab is open, those always win: if the toolbar popup's numbers are edited or reset, they snap back. With no dashboard open, the extension uses its own saved numbers and adds each Continue to what you owe.
@@ -63,7 +63,7 @@ React 19 and Vite 7, with no router and no state library. `App.jsx` holds the sh
 
 | Feature | What it does | Main files |
 |---|---|---|
-| Safe to spend (top card) | Headline **Safe to spend**, a status in words, the sum behind it (Safe limit − You owe = Safe to spend) and one bar. Same number and words as the extension. What you owe = starting balance + this month's purchases. **Detailed view** (⚙ Settings, remembered) adds card limit, this month's purchases, % of card and safe limit used, and the colour key. The headline is identical in both views. | `AccountOverview.jsx`, `account.js`, `statements/monthlyBalance.js` |
+| Safe to spend (top card) | Headline **Safe to spend** by default (or the user’s chosen balance figure), a status in words, the sum behind it (Safe limit − You owe = Safe to spend) and one bar. Same number and words as the extension. What you owe = starting balance + this month's purchases. **Detailed view** (⚙ Settings, remembered) adds card limit, this month's purchases, % of card and safe limit used, and the colour key. The selected headline is identical in both Simple and Detailed views. | `AccountOverview.jsx`, `account.js`, `statements/monthlyBalance.js` |
 | Try a purchase first | Type an amount to see "After this: £X safe to spend" or "£X over your safe limit". Never changes the account. | `SafeZoneGauge.jsx`, `PurchaseProjection.jsx` |
 | Reflection queue | Checkouts paused by the extension, kept for 30 minutes. "I don't need this" removes an item and adds it to **Total Impulse Money Saved**. | `ImpulseCoolingQueue.jsx`, `coolingQueue.js`, `hooks/useCoolingQueue.js` |
 | Request Grace | Draft → edit → review → disclaimer and consent → send → status updates. The decision is simulated at random and doesn't predict a real lender. | `RequestGrace.jsx`, `grace.js` |
@@ -74,6 +74,7 @@ React 19 and Vite 7, with no router and no state library. `App.jsx` holds the sh
 
 ### Display preferences
 
+- **Main balance number** is always available in Everyday settings: Safe to spend (default), Card limit remaining, or What you owe. The website, toolbar and checkout before/after figures use the same choice. Plain definitions and an always-visible safe-limit gauge keep the meanings distinct; choosing another headline keeps Safe to spend visible too. Card remaining is clamped to zero over the card limit; the safe-limit warning still shows the overage. The choice persists independently of Advanced Mode.
 - The native modal is centred, scrolls within small screens, keeps Tab/Shift+Tab focus inside, closes with Escape/Done/× and returns focus to Settings.
 - Advanced Mode changes reading comfort only. It never changes amounts, gauge bands, the reflection timer or money rules. Text sizes are 100%, 112.5% and 125%; labels use plain words. Comfortable spacing gives controls more room. Reduced motion removes decorative animation and transitions; the device preference is always respected, even with Advanced Mode off.
 - Theme, font and Simple/Detailed view always apply. Advanced text size, spacing and motion apply only while Advanced Mode is on. Detailed view optionally shows percentages in both extension surfaces; the default stays percentage-free.
@@ -147,9 +148,9 @@ All messages are `window.postMessage` within the dashboard tab. Both sides check
 | dash → ext | `purchase-saved` `{id}` | Saved for good, so the extension deletes its pending copy. |
 | ext → dash | `cooling-item` `{version, id, title, store, amount, savedAt, expiresAt}` | Added to the reflection queue, then acknowledged. |
 | dash → ext | `cooling-item-saved` `{id}` | As above. |
-| dash → ext | `preferences` `{font, display}` | `display` contains validated theme, font, view, advancedMode, textSize, spacing and reduceMotion. Both extension surfaces update live. Legacy font-only messages still work. Sent on start-up, handshake and changes. |
+| dash → ext | `preferences` `{font, display}` | `display` contains validated theme, font, view, advancedMode, textSize, spacing, reduceMotion and balanceFigure. Both extension surfaces update live. Legacy font-only messages still work. Sent on start-up, handshake and changes. |
 | dash → ext | `reset` | Reset demo was pressed. The extension forgets approved shops. |
-| dash → ext | `snapshot` `{monthlyBudget, currentSpent}` (pence) | The extension takes these as its budget and spend. Sent on start-up and whenever they change. |
+| dash → ext | `snapshot` `{monthlyBudget, currentSpent, cardLimit?}` (pence) | The extension takes these as its safe limit and spend. Optional cardLimit supplies the full card limit for the chosen headline; it is never inferred from the safe limit. A legacy snapshot clears it to unknown. Sent on start-up and whenever they change. |
 
 Reliability:
 
@@ -186,13 +187,14 @@ The account itself (balance, limit, target, support request) lives in memory onl
 | `checkoutGuard.cooling.<id>` | A paused checkout waiting for the dashboard |
 | `checkoutGuard.approved.<hostname>` | Time until which that shop won't pause again (30 min) |
 | `checkoutGuard.font` | Legacy-compatible `default` or `dyslexic` preference |
+| `checkoutGuard.cardLimit` | Full card limit in integer pence, or null when unavailable; only set by dashboard snapshots |
 | `checkoutGuard.preferences` | Effective display preferences, set by the dashboard; survives both Reset buttons |
 
 ## Testing and CI
 
 | Command | Covers |
 |---|---|
-| `npm test` | 47 Node unit tests: money parsing, gauge bands, balance maths, statement parsing and dates, storage, checkout sync, cooling queue, extension core (Chrome and Firefox storage, budgets, approvals, snapshot), display migration/validation/persistence, and the money and display contracts between extension and dashboard. |
+| `npm test` | 50 Node unit tests: money parsing, gauge bands, balance maths, statement parsing and dates, storage, checkout sync, cooling queue, extension core (Chrome and Firefox storage, budgets, approvals, snapshot), display migration/validation/persistence, and the money and display contracts between extension and dashboard. |
 | `npm run lint:extension` | Mozilla `web-ext lint` on `checkout-guard/`. |
 | `npm run test:browser` | Playwright + real Chromium, about 1 minute: the dashboard flows on the built `dist/` (served from a sub-folder), Advanced Mode, modal keyboard/mobile behaviour, preference persistence, extension display changes and popup behaviour with simulated storage, detection fixtures (Amazon, Shopify/GamerSupps, product pages, hidden tabs), the toolbar popup, and **the real extension loaded next to the dashboard** checking the same "safe to spend" number on both sides, Continue, shop approval, Reset demo, the toolbar popup snapping back to the dashboard's numbers, and Leave → reflection queue. Fails on any JavaScript error in the page. |
 | `npm run pack:extension` | Unsigned ZIP in `web-ext-artifacts/`. |
@@ -213,6 +215,7 @@ GitHub Actions (`.github/workflows/check.yml`) runs all of these on every push a
 index.html                  page shell + extension marker <meta name="checkout-guard-dashboard">
 src/main.jsx                starts React
 src/App.jsx                 layout, shared state, navigation, reset
+src/balanceFigure.js        labels, definitions and chosen balance calculations (pence)
 src/preferences.js          display validation, migration, storage and effective advanced choices
 src/account.js              demo account, pounds→pence parsing, safe-to-spend maths
 src/grace.js                Request Grace status steps

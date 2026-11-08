@@ -15,9 +15,11 @@
     </label>
   </header>
   <main>
-    <section class="card" aria-label="Safe to spend">
-      <div class="budget-summary"><span>Safe to spend</span></div>
-      <p id="remainingAmount" class="remaining-val">—</p>
+    <section class="card" aria-label="Your balance">
+      <div aria-live="polite" aria-atomic="true"><div class="budget-summary"><span id="balanceLabel">Safe to spend</span></div>
+      <p id="remainingAmount" class="remaining-val">—</p></div>
+      <p id="balanceExplanation"></p>
+      <p id="safeSummary" hidden></p>
       <div id="budgetMeter" class="progress-bar" role="meter" aria-label="Safe limit used" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
         <div id="budgetProgress" class="progress-fill" data-zone="safe"></div>
       </div>

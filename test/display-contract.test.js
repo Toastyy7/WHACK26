@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import { effectiveDisplayPreferences } from '../src/preferences.js';
+import { getBalanceFigure } from '../src/balanceFigure.js';
 
 function extension(values = {}) {
   const listeners = new Set();
@@ -26,6 +27,34 @@ test('website and extension apply exactly the same display preferences, includin
   }
 });
 
+test('chosen balance figures match across website and extension, including zero, over-limit and unknown card limit', () => {
+  const { guard } = extension();
+  for (const owed of [0, 28000, 30000, 30001, 100000, 100001]) {
+    for (const cardLimit of [100000, null]) {
+      for (const mode of ['safe-to-spend', 'card-remaining', 'owed', 'unknown']) {
+        const values = { safeLimit: 30000, owed, cardLimit };
+        assert.equal(JSON.stringify(guard.getBalanceFigure(mode, values)), JSON.stringify(getBalanceFigure(mode, values)));
+      }
+    }
+  }
+  assert.equal(getBalanceFigure('card-remaining', { safeLimit: 30000, owed: 28000, cardLimit: 100000 }).amount, 72000);
+  assert.equal(getBalanceFigure('card-remaining', { safeLimit: 30000, owed: 100001, cardLimit: 100000 }).amount, 0);
+  assert.equal(getBalanceFigure('owed', { safeLimit: 30000, owed: 28000 }).amount, 28000);
+  assert.equal(getBalanceFigure('card-remaining', { safeLimit: 30000, owed: 28000 }).amount, null);
+});
+
+test('headline choice persists independently of Advanced Mode and old preferences default to safe to spend', async () => {
+  const { guard } = extension();
+  const preferences = effectiveDisplayPreferences({ balanceFigure: 'card-remaining', advancedMode: false });
+  assert.equal(preferences.balanceFigure, 'card-remaining');
+  await guard.setDisplayPreferences(preferences);
+  assert.equal((await guard.getDisplayPreferences()).balanceFigure, 'card-remaining');
+  assert.equal(guard.displayPreferences({ balanceFigure: '<style>' }).balanceFigure, 'safe-to-spend');
+  const { balanceFigure, ...legacy } = preferences;
+  await guard.setDisplayPreferences(legacy);
+  assert.equal((await guard.getDisplayPreferences()).balanceFigure, 'safe-to-spend');
+});
+
 test('display choices survive budget resets, migrate the font, and reject malformed bridge payloads', async () => {
   const { guard, values } = extension({ 'checkoutGuard.font': 'dyslexic' });
   assert.equal((await guard.getDisplayPreferences()).font, 'dyslexic');
@@ -35,7 +64,7 @@ test('display choices survive budget resets, migrate the font, and reject malfor
   await guard.clearApprovals();
   assert.equal(JSON.stringify(await guard.getDisplayPreferences()), JSON.stringify(preferences));
   assert.equal(await guard.getFont(), preferences.font);
-  for (const bad of [null, 'dark', {}, { ...preferences, textSize: '900px' }, { ...preferences, reduceMotion: 'true' }]) {
+  for (const bad of [null, 'dark', {}, { ...preferences, textSize: '900px' }, { ...preferences, reduceMotion: 'true' }, { ...preferences, balanceFigure: 'bad' }]) {
     await assert.rejects(guard.setDisplayPreferences(bad));
   }
   assert.equal(values.currentSpent, guard.defaults.currentSpent);

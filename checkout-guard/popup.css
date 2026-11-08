@@ -59,3 +59,7 @@ footer { margin-top: 16px; }
 :root[data-theme='dark'] .progress-fill[data-zone='danger'] { background: #ff8686; }
 :root[data-reduce-motion='true'] *, :root[data-reduce-motion='true'] *::before { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 @media (prefers-reduced-motion: reduce) { *, *::before { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
+
+#balanceExplanation, #safeSummary { font-size: calc(12px * var(--cg-scale)); }
+#balanceExplanation { color: var(--cg-muted); }
+#safeSummary { font-weight: 700; }

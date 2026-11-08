@@ -511,3 +511,7 @@ body:has(.settings-dialog[open]) { overflow: hidden; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 }
+
+.balance-explanation { font-size: 0.9rem; margin: 0; max-width: 42ch; }
+.balance-safe { margin: 4px 0; }
+.balance-headline { overflow-wrap: anywhere; }

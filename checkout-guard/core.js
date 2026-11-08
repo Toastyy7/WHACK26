@@ -60,6 +60,22 @@
     };
   }
 
+  // Display-only amounts, in integer pence. The safe-limit gauge is independent.
+  const balanceFigures = [
+    { value: 'safe-to-spend', label: 'Safe to spend', description: 'Your chosen safe limit minus what you owe.' },
+    { value: 'card-remaining', label: 'Card limit remaining', description: 'Your full card limit minus what you owe. Your safe-to-spend amount can be lower.' },
+    { value: 'owed', label: 'What you owe', description: 'The amount currently owed on your card.' },
+  ];
+
+  function getBalanceFigure(mode, { safeLimit, owed, cardLimit }) {
+    const choice = balanceFigures.find((item) => item.value === mode) ?? balanceFigures[0];
+    const balance = Math.max(0, owed);
+    const amount = choice.value === 'owed' ? balance : choice.value === 'card-remaining'
+      ? Number.isSafeInteger(cardLimit) && cardLimit > 0 ? Math.max(0, cardLimit - balance) : null
+      : Math.max(0, safeLimit - balance);
+    return { label: choice.label, description: choice.description, amount };
+  }
+
   function api() {
     if (globalThis.browser?.storage?.local) return { extension: globalThis.browser, promises: true };
     if (globalThis.chrome?.storage?.local) return { extension: globalThis.chrome, promises: false };
@@ -80,11 +96,14 @@
     });
   }
 
+  const cardLimitKey = 'checkoutGuard.cardLimit';
+  const validCardLimit = (value) => Number.isSafeInteger(value) && value > 0 && value <= 999999999;
+
   function subscribe(listener) {
     const event = api()?.extension.storage.onChanged;
     if (!event) return () => {};
     const handle = (changes, area) => {
-      if (area === 'local' && Object.keys(defaults).some((key) => key in changes)) listener();
+      if (area === 'local' && (cardLimitKey in changes || Object.keys(defaults).some((key) => key in changes))) listener();
     };
     event.addListener(handle);
     return () => event.removeListener(handle);
@@ -153,9 +172,9 @@
   }
 
   // Settings store pounds; keep maths in integer pence and convert once.
-  async function updateSettings(change) {
+  async function updateSettings(change, extra = {}) {
     const current = normalise(await storage('get', defaults));
-    await storage('set', normalise({ ...current, ...change }));
+    await storage('set', { ...normalise({ ...current, ...change }), ...extra });
   }
 
   async function recordSpend(amount) {
@@ -167,10 +186,11 @@
   // The open dashboard is the source of truth: its target becomes the budget and
   // this month's dashboard spending becomes the extension's spend.
   async function applySnapshot(snapshot) {
-    const { monthlyBudget, currentSpent } = snapshot ?? {};
+    const { monthlyBudget, currentSpent, cardLimit } = snapshot ?? {};
     if (!Number.isSafeInteger(monthlyBudget) || monthlyBudget <= 0 ||
-        !Number.isSafeInteger(currentSpent) || currentSpent < 0) throw new Error('Invalid dashboard snapshot.');
-    await updateSettings({ monthlyBudget: (monthlyBudget / 100).toFixed(2), currentSpent: (currentSpent / 100).toFixed(2) });
+        !Number.isSafeInteger(currentSpent) || currentSpent < 0 ||
+        (cardLimit !== undefined && !validCardLimit(cardLimit))) throw new Error('Invalid dashboard snapshot.');
+    await updateSettings({ monthlyBudget: (monthlyBudget / 100).toFixed(2), currentSpent: (currentSpent / 100).toFixed(2) }, { [cardLimitKey]: cardLimit ?? null });
   }
 
   // Once someone continues past (or closes) the pause, later steps of the same
@@ -210,6 +230,7 @@
       textSize: advancedMode && ['large', 'extra-large'].includes(input.textSize) ? input.textSize : 'normal',
       spacing: advancedMode && input.spacing === 'comfortable' ? 'comfortable' : 'standard',
       reduceMotion: advancedMode && input.reduceMotion === true,
+      balanceFigure: ['safe-to-spend', 'card-remaining', 'owed'].includes(input.balanceFigure) ? input.balanceFigure : 'safe-to-spend',
     };
   }
   async function getDisplayPreferences() {
@@ -222,7 +243,8 @@
     if (!value || !['light', 'dark'].includes(value.theme) || !fonts.includes(value.font) ||
         !['simple', 'detailed'].includes(value.view) || typeof value.advancedMode !== 'boolean' ||
         !['normal', 'large', 'extra-large'].includes(value.textSize) ||
-        !['standard', 'comfortable'].includes(value.spacing) || typeof value.reduceMotion !== 'boolean') {
+        !['standard', 'comfortable'].includes(value.spacing) || typeof value.reduceMotion !== 'boolean' ||
+        (value.balanceFigure !== undefined && !['safe-to-spend', 'card-remaining', 'owed'].includes(value.balanceFigure))) {
       throw new Error('Invalid display preferences.');
     }
     const preferences = displayPreferences(value);
@@ -254,7 +276,7 @@
   }
 
   globalThis.CheckoutGuard = Object.freeze({
-    displayPreferences, getDisplayPreferences, setDisplayPreferences, subscribeDisplayPreferences, applyDisplayPreferences,
+    getBalanceFigure, displayPreferences, getDisplayPreferences, setDisplayPreferences, subscribeDisplayPreferences, applyDisplayPreferences,
     recordSpend, applySnapshot, approve, isApproved, clearApprovals, getFont, setFont, subscribeFont, fileUrl,
     queuePurchase, pendingPurchases, subscribePurchases, validPurchase,
     acknowledgePurchase: (id) => storage('remove', purchasePrefix + id),
@@ -262,7 +284,10 @@
     acknowledgeCoolingItem: (id) => storage('remove', coolingPrefix + id),
     defaults, pence, parseGbp, normalise, validSettings, money, impact,
     available: () => api() !== null,
-    load: async () => normalise(await storage('get', defaults)),
+    load: async () => {
+      const data = await storage('get', { ...defaults, [cardLimitKey]: null });
+      return { ...normalise(data), cardLimit: validCardLimit(data?.[cardLimitKey]) ? data[cardLimitKey] : null };
+    },
     save: async (settings) => {
       if (!validSettings(settings)) throw new Error('Invalid budget settings.');
       await storage('set', normalise(settings));

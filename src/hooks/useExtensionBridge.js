@@ -10,8 +10,8 @@ export const resetExtension = () => post({ type: 'reset' });
 // Extension → dashboard: purchases and paused checkouts, acknowledged only once saved.
 // Dashboard → extension: a snapshot (integer pence) so both show the same budget and spend,
 // and display preferences so the toolbar and checkout popups match the dashboard.
-export default function useExtensionBridge({ monthlyBudget, currentSpent, receivePurchase, receiveCoolingItem, font = 'default', displayPreferences }) {
-  const snapshot = { type: 'snapshot', monthlyBudget, currentSpent: Math.max(0, currentSpent) };
+export default function useExtensionBridge({ monthlyBudget, currentSpent, receivePurchase, receiveCoolingItem, font = 'default', displayPreferences, cardLimit }) {
+  const snapshot = { type: 'snapshot', monthlyBudget, currentSpent: Math.max(0, currentSpent), cardLimit };
   const latest = useRef();
   const preferences = { type: 'preferences', font, display: displayPreferences };
   latest.current = { receivePurchase, receiveCoolingItem, snapshot, preferences };
@@ -37,6 +37,6 @@ export default function useExtensionBridge({ monthlyBudget, currentSpent, receiv
   }, []);
 
   // Resend whenever the shared numbers change.
-  useEffect(() => post(snapshot), [snapshot.monthlyBudget, snapshot.currentSpent]);
-  useEffect(() => post(preferences), [font, displayPreferences?.theme, displayPreferences?.view, displayPreferences?.advancedMode, displayPreferences?.textSize, displayPreferences?.spacing, displayPreferences?.reduceMotion]);
+  useEffect(() => post(snapshot), [snapshot.monthlyBudget, snapshot.currentSpent, snapshot.cardLimit]);
+  useEffect(() => post(preferences), [font, displayPreferences?.theme, displayPreferences?.view, displayPreferences?.advancedMode, displayPreferences?.textSize, displayPreferences?.spacing, displayPreferences?.reduceMotion, displayPreferences?.balanceFigure]);
 }

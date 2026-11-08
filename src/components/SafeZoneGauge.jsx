@@ -3,7 +3,7 @@ import PurchaseProjection from './PurchaseProjection.jsx';
 
 // "Try a purchase first": a what-if that never changes the account.
 // The current safe-to-spend number and bar live in AccountOverview, not here.
-export default function SafeZoneGauge({ account }) {
+export default function SafeZoneGauge({ account, balanceFigure }) {
   const [purchase, setPurchase] = useState('');
   return (
     <section className="card">
@@ -28,7 +28,7 @@ export default function SafeZoneGauge({ account }) {
       </button>
       {/* role="status" lets screen readers announce changes to the preview. */}
       <div id="projection" className="result" role="status">
-        <PurchaseProjection purchase={purchase} account={account} />
+        <PurchaseProjection purchase={purchase} account={account} balanceFigure={balanceFigure} />
       </div>
     </section>
   );

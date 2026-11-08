@@ -1,4 +1,5 @@
 import React, { useRef, useState } from 'react';
+import { balanceFigures } from '../balanceFigure.js';
 
 function Switch({ name, description, checked, onChange, id }) {
   return (
@@ -36,6 +37,12 @@ export default function SettingsMenu({ preferences, onChange, storageSaved }) {
         <p id="settings-description" className="muted">Choose what helps you read and focus. These choices also apply to CheckoutGuard’s toolbar and checkout popups.</p>
         <section aria-labelledby="everyday-settings-title" className="settings-section">
           <h3 id="everyday-settings-title">Everyday settings</h3>
+          <label className="settings-select" htmlFor="setting-balance"><strong>Main balance number</strong>
+            <small id="setting-balance-hint" className="muted">Choose the main figure on the website and extension. The gauge always follows your safe limit.</small>
+            <select id="setting-balance" aria-describedby="setting-balance-hint" value={preferences.balanceFigure} onChange={(event) => set('balanceFigure', event.target.value)}>
+              {balanceFigures.map((choice) => <option key={choice.value} value={choice.value}>{choice.label}</option>)}
+            </select>
+          </label>
           <Switch id="setting-theme" name="Dark mode" description="Use a darker background with lighter text." checked={preferences.theme === 'dark'} onChange={(on) => set('theme', on ? 'dark' : 'light')} />
           <Switch id="setting-view" name="Detailed view" description="Show extra figures and percentages. Safe to spend stays the same." checked={preferences.view === 'detailed'} onChange={(on) => set('view', on ? 'detailed' : 'simple')} />
           <Switch id="setting-font" name="Dyslexia-friendly font (OpenDyslexic)" description="Try a different letter shape. Choose whichever font feels easier for you." checked={preferences.font === 'dyslexic'} onChange={(on) => set('font', on ? 'dyslexic' : 'default')} />

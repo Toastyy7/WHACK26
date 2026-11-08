@@ -1,7 +1,7 @@
 // Display choices only. Never change account amounts or gauge rules here.
 export const displayDefaults = Object.freeze({
   theme: 'light', font: 'default', view: 'simple', advancedMode: false,
-  textSize: 'normal', spacing: 'standard', reduceMotion: false,
+  textSize: 'normal', spacing: 'standard', reduceMotion: false, balanceFigure: 'safe-to-spend',
 });
 const key = 'credit-guard-personalisation-v1';
 
@@ -15,6 +15,7 @@ export function normaliseDisplayPreferences(value, theme = 'light') {
     textSize: ['normal', 'large', 'extra-large'].includes(input.textSize) ? input.textSize : 'normal',
     spacing: ['standard', 'comfortable'].includes(input.spacing) ? input.spacing : 'standard',
     reduceMotion: input.reduceMotion === true,
+    balanceFigure: ['safe-to-spend', 'card-remaining', 'owed'].includes(input.balanceFigure) ? input.balanceFigure : 'safe-to-spend',
   };
 }
 export function effectiveDisplayPreferences(value) {
