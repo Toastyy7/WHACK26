@@ -12,6 +12,7 @@ Then load `checkout-guard/` as an unpacked extension.
 
 | Doc | Read it to… |
 |---|---|
+| [AGENTS.md](AGENTS.md) | **AI agents, read first:** branch rules, questions to ask, test checklist, pull requests |
 | [docs/LAUNCH.md](docs/LAUNCH.md) | run the app and extension, run the tests, fix common problems |
 | [docs/PROJECT.md](docs/PROJECT.md) | understand features, money rules, sync protocol, stored data and every file |
 | [docs/REPO-FIX.md](docs/REPO-FIX.md) | clean up the repo and the team's git workflow |
