@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { createInitialAccount } from './account.js';
+import { createInitialAccount, getGaugeState } from './account.js';
 import AccountOverview from './components/AccountOverview.jsx';
 import SafeZoneGauge from './components/SafeZoneGauge.jsx';
 import ImpulseCoolingQueue from './components/ImpulseCoolingQueue.jsx';
@@ -7,6 +7,7 @@ import RequestGrace from './components/RequestGrace.jsx';
 import DemoControls from './components/DemoControls.jsx';
 import NavigationMenu from './components/NavigationMenu.jsx';
 import ThemeToggle from './components/ThemeToggle.jsx';
+import ViewToggle, { getInitialView } from './components/ViewToggle.jsx';
 import StatementAnalysis from './components/StatementAnalysis.jsx';
 import HomeSpendingSummary from './components/HomeSpendingSummary.jsx';
 import useSavedStatement from './hooks/useSavedStatement.js';
@@ -14,6 +15,7 @@ import { setTransactionIncluded } from './statements/selection.js';
 import { monthlyBalance } from './statements/monthlyBalance.js';
 import useCurrentMonth from './hooks/useCurrentMonth.js';
 import useCoolingQueue from './hooks/useCoolingQueue.js';
+import useExtensionBridge, { resetExtension } from './hooks/useExtensionBridge.js';
 
 // App owns the data shared by the panels below. Props pass that data to each panel.
 export default function App() {
@@ -21,7 +23,9 @@ export default function App() {
   // Passing the function here creates the starting account on the first render.
   // Navigation changes the visible screen without discarding account data or drafts.
   const [page, setPage] = useState('home');
-  const { savedStatement, updateSavedStatement, storageError } = useSavedStatement();
+  // Like the theme, the view choice is kept across Reset demo.
+  const [view, setView] = useState(getInitialView);
+  const { savedStatement, updateSavedStatement, receivePurchase, storageError } = useSavedStatement();
   const { queue, addCoolingItem, dismissCoolingItem, resetCoolingQueue, coolingError } = useCoolingQueue();
   const [statementKey, setStatementKey] = useState(0);
   const heading = useRef(null);
@@ -29,6 +33,14 @@ export default function App() {
   const month = useCurrentMonth();
   const adjustment = monthlyBalance(account.balance, savedStatement?.result.transactions ?? [], month);
   const displayedAccount = { ...account, balance: adjustment.balance };
+  // One money model: the extension gets the safe limit and what is owed, so both
+  // sides show the same "safe to spend" (safe limit − owed).
+  useExtensionBridge({
+    monthlyBudget: getGaugeState(displayedAccount.balance, account.limit, account.target).threshold,
+    currentSpent: displayedAccount.balance,
+    receivePurchase,
+    receiveCoolingItem: addCoolingItem,
+  });
   // Changing this key tells React to recreate the panels and clear their local state.
   const [resetKey, setResetKey] = useState(0);
   // useRef keeps the pending timeout ID without causing a render when it changes.
@@ -63,6 +75,7 @@ export default function App() {
     timer.current = null;
     setAccount(createInitialAccount());
     resetCoolingQueue();
+    resetExtension();
     clearStatement();
     setPage('home');
     // Remount the panels to clear local inputs and close the demo controls.
@@ -74,6 +87,7 @@ export default function App() {
         <span className="brand">◈ &nbsp; Adaptive Credit Guard</span>
         <div className="header-actions" key={resetKey}>
           <NavigationMenu page={page} onNavigate={navigate} />
+          <ViewToggle view={view} onChange={setView} />
           <ThemeToggle />
           <button className="secondary" onClick={reset}>Reset demo</button>
         </div>
@@ -90,7 +104,7 @@ export default function App() {
       <div key={resetKey}>
         {/* Keep screens mounted so navigating home preserves the request and preview. */}
         <div hidden={page !== 'home'}>
-          <AccountOverview account={displayedAccount} monthlyOutgoing={adjustment.outgoing} month={month} />
+          <AccountOverview account={displayedAccount} detailed={view === 'detailed'} monthlyOutgoing={adjustment.outgoing} />
           <SafeZoneGauge account={displayedAccount} />
           <ImpulseCoolingQueue
             items={queue.items}

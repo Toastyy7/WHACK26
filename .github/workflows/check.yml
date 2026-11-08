@@ -1,0 +1,44 @@
+name: Check
+
+# Every branch and every pull request; nothing here pushes or deploys.
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: npm ci
+      - run: npm test
+      - run: npm run lint:extension
+      - run: npm run build
+      - name: Committed dist/ matches the source
+        run: |
+          if [ -n "$(git status --porcelain -- dist)" ]; then
+            git status --short -- dist
+            echo "::error::dist/ is out of date. Run npm run build and commit dist/."
+            exit 1
+          fi
+      - run: pip install -r requirements-browser.txt
+      - run: python -m playwright install --with-deps chromium
+      - run: npm run test:browser
+      - run: npm run pack:extension
+      - uses: actions/upload-artifact@v4
+        with:
+          name: offline-demo-and-extension
+          path: |
+            dist/
+            web-ext-artifacts/

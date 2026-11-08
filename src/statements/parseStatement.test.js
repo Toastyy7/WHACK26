@@ -77,3 +77,15 @@ test('categories are general suggestions and edited categories change totals', (
   transactions[0].category = 'Groceries';
   assert.deepEqual(summarize(transactions), [{ category: 'Groceries', amount: 600, count: 2 }]);
 });
+
+test('accepts Nationwide-style £Out/£In and Payments out/in headings', () => {
+  for (const [out, inn] of [['£Out', '£In'], ['£ Out', '£ In'], ['Payments out', 'Payments in']]) {
+    const columns = header().map((item) => ({ ...item, text: item.text.replace('£ Paid out', out).replace('£ Paid in', inn) }));
+    const result = parseStatement([[...columns,
+      text('03 Feb 2026', 20, 670), text('TESCO STORES', 140, 670), outgoing('12.50', 670), balance('100.00', 670),
+      text('04 Feb 2026', 20, 650), text('SALARY', 140, 650), incoming('900.00', 650), balance('1000.00', 650),
+    ]]);
+    assert.equal(result.transactions.length, 1, out);
+    assert.equal(result.transactions[0].amount, 1250, out);
+  }
+});

@@ -23,7 +23,7 @@ export default function RequestGrace({ account, updateAccount, timer }) {
   }
   return (
     <section className="card">
-      <p className="eyebrow">02 / REQUEST GRACE</p>
+      <p className="eyebrow">03 / REQUEST GRACE</p>
       <h2>Request Grace</h2>
       <p>Send a written request and follow its status here.</p>
       {/* Announce progress and results to screen readers when the status changes. */}

@@ -25,8 +25,8 @@ export function groupRows(items) {
 function findColumns(rows) {
   for (const row of rows) {
     // Match headings independently of spacing, currency symbols and bank names.
-    const out = row.items.find((item) => /^(paidout|moneyout|debit|debits|withdrawals)$/.test(compact(item.text)));
-    const incoming = row.items.find((item) => /^(paidin|moneyin|credit|credits|deposits)$/.test(compact(item.text)));
+    const out = row.items.find((item) => /^(paidout|moneyout|paymentsout|out|debit|debits|withdrawals)$/.test(compact(item.text)));
+    const incoming = row.items.find((item) => /^(paidin|moneyin|paymentsin|in|credit|credits|deposits)$/.test(compact(item.text)));
     const balance = row.items.find((item) => /^(balance|runningbalance)$/.test(compact(item.text)));
     if (out && incoming) return { y: row.y, out, incoming, balance };
   }

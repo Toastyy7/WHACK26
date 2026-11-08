@@ -3,7 +3,7 @@ const gbp = new Intl.NumberFormat('en-GB', {
   style: 'currency',
   currency: 'GBP',
   maximumFractionDigits: 2,
-  minimumFractionDigits: 0,
+  minimumFractionDigits: 2,
 });
 // Divide by 100 because the stored amount is pence, while Intl expects pounds.
 export const formatMoney = (amount) => gbp.format(amount / 100);

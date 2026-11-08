@@ -11,6 +11,6 @@ export function monthlyBalance(baseBalance, transactions, month) {
     .filter((transaction) => transaction.isoDate?.slice(0, 7) === month)
     .reduce((sum, transaction) => sum + transaction.amount, 0);
   // Derive the result instead of changing the original balance. This prevents
-  // repeat deductions on refresh and restores money when a transaction is removed.
-  return { balance: baseBalance - outgoing, outgoing };
+  // repeat additions on refresh and undoes a purchase when its transaction is removed.
+  return { balance: baseBalance + outgoing, outgoing };
 }

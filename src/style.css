@@ -90,8 +90,9 @@ h2 {
 }
 .overview {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
-  gap: 20px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 340px);
+  align-items: center;
+  gap: 14px 32px;
   padding: 24px;
   background: var(--brand-blue);
   border-top: 4px solid var(--brand-red);
@@ -105,11 +106,6 @@ h2 {
 }
 .overview strong {
   font-size: 2.15rem;
-}
-.grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(315px, 100%), 1fr));
-  gap: 16px;
 }
 .card,
 .demo {
@@ -221,10 +217,6 @@ button:disabled {
 .badge[class*='zone-'] {
   color: var(--zone-text);
   background: var(--zone-background);
-}
-.gauge-legend {
-  font-size: 0.85rem;
-  color: var(--muted);
 }
 .badge {
   display: inline-block;
@@ -370,7 +362,19 @@ td select { min-width: 210px; margin: 0; }
 .transaction-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 10px; }
 .transaction-actions strong { white-space: nowrap; }
 
-.balance-adjustment { font-size: 0.85rem; margin-top: 8px; max-width: 32rem; }
+.overview-main { display: grid; gap: 8px; justify-items: start; }
+.overview .badge { margin: 4px 0 0; }
+.overview .gauge, .overview-details, .overview-key { grid-column: 1 / -1; }
+.overview .gauge { margin: 4px 0 0; background: rgba(255, 255, 255, 0.25); }
+.overview dl { margin: 0; }
+.overview dl div { display: flex; justify-content: space-between; gap: 16px; padding: 6px 0; }
+.overview dt, .overview dd { margin: 0; }
+.overview dd { font-variant-numeric: tabular-nums; font-weight: 650; }
+.overview-sum { padding: 12px 16px; border-radius: 12px; background: rgba(255, 255, 255, 0.1); font-size: 1.05rem; }
+.overview-total { border-top: 1px solid rgba(255, 255, 255, 0.5); margin-top: 4px; font-weight: 700; }
+.overview-details { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr)); gap: 0 24px; padding-top: 8px; border-top: 1px solid rgba(255, 255, 255, 0.25); font-size: 0.95rem; }
+.overview-key { margin: 0; font-size: 0.85rem; }
+@media (max-width: 640px) { .overview { grid-template-columns: 1fr; } }
 
 .add-transaction { margin: 24px 0; padding: 20px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
 .add-transaction fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }

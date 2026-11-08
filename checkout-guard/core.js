@@ -43,9 +43,6 @@
   const money = (amount) => new Intl.NumberFormat('en-GB', {
     style: 'currency', currency: 'GBP',
   }).format(amount / 100);
-  const percent = (amount) => new Intl.NumberFormat('en-GB', {
-    maximumFractionDigits: 2,
-  }).format(amount) + '%';
 
   function impact(settings, purchase = 0) {
     const budget = pence(settings.monthlyBudget);
@@ -57,8 +54,9 @@
       projected, percentage, zone,
       width: Math.min(100, Math.max(0, percentage)),
       remaining: Math.max(0, budget - projected),
-      label: zone === 'danger' ? `${money(projected - budget)} over your budget.`
-        : zone === 'warning' ? 'Approaching spending limit.' : 'Within your budget.',
+      // Same words as the dashboard (src/account.js getGaugeState); a contract test checks this.
+      label: zone === 'danger' ? `${money(projected - budget)} over your safe limit`
+        : zone === 'warning' ? 'Close to your safe limit' : 'Within your safe limit',
     };
   }
 
@@ -154,12 +152,49 @@
     return () => event.removeListener(handle);
   }
 
+  // Settings store pounds; keep maths in integer pence and convert once.
+  async function updateSettings(change) {
+    const current = normalise(await storage('get', defaults));
+    await storage('set', normalise({ ...current, ...change }));
+  }
+
+  async function recordSpend(amount) {
+    if (!Number.isSafeInteger(amount) || amount <= 0) throw new Error('Invalid purchase amount.');
+    const current = normalise(await storage('get', defaults));
+    await updateSettings({ currentSpent: ((pence(current.currentSpent) + amount) / 100).toFixed(2) });
+  }
+
+  // The open dashboard is the source of truth: its target becomes the budget and
+  // this month's dashboard spending becomes the extension's spend.
+  async function applySnapshot(snapshot) {
+    const { monthlyBudget, currentSpent } = snapshot ?? {};
+    if (!Number.isSafeInteger(monthlyBudget) || monthlyBudget <= 0 ||
+        !Number.isSafeInteger(currentSpent) || currentSpent < 0) throw new Error('Invalid dashboard snapshot.');
+    await updateSettings({ monthlyBudget: (monthlyBudget / 100).toFixed(2), currentSpent: (currentSpent / 100).toFixed(2) });
+  }
+
+  // Once someone continues past (or closes) the pause, later steps of the same
+  // shop's checkout must not pause again or record the order twice.
+  const approvalPrefix = 'checkoutGuard.approved.';
+  const approvalMs = 30 * 60 * 1000;
+  const approve = (host, now = Date.now()) => storage('set', { [approvalPrefix + host]: now + approvalMs });
+  // Reset demo (dashboard) and Reset (popup) make every shop pause again.
+  async function clearApprovals() {
+    const keys = Object.keys(await storage('get', null)).filter((key) => key.startsWith(approvalPrefix));
+    for (const key of keys) await storage('remove', key);
+  }
+  async function isApproved(host, now = Date.now()) {
+    const until = (await storage('get', approvalPrefix + host))?.[approvalPrefix + host];
+    return Number.isSafeInteger(until) && until > now;
+  }
+
   globalThis.CheckoutGuard = Object.freeze({
+    recordSpend, applySnapshot, approve, isApproved, clearApprovals,
     queuePurchase, pendingPurchases, subscribePurchases, validPurchase,
     acknowledgePurchase: (id) => storage('remove', purchasePrefix + id),
     queueCoolingItem, pendingCoolingItems, subscribeCoolingItems, validCoolingItem,
     acknowledgeCoolingItem: (id) => storage('remove', coolingPrefix + id),
-    defaults, pence, parseGbp, normalise, validSettings, money, percent, impact,
+    defaults, pence, parseGbp, normalise, validSettings, money, impact,
     available: () => api() !== null,
     load: async () => normalise(await storage('get', defaults)),
     save: async (settings) => {

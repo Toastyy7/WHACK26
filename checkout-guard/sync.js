@@ -10,6 +10,13 @@
   let ready = false;
   const offeredPurchases = new Set();
   const offeredCooling = new Set();
+  // The dashboard is the source of truth while it is open: remember its last numbers.
+  let snapshot = null;
+
+  async function applySnapshot() {
+    try { if (snapshot) await guard.applySnapshot(snapshot); }
+    catch (error) { console.warn('[CheckoutGuard] Dashboard numbers not applied:', error.message); }
+  }
 
   async function deliver() {
     if (!ready || !document.querySelector('meta[name="checkout-guard-dashboard"][content="v1"]')) return;
@@ -27,7 +34,12 @@
 
   window.addEventListener('message', async (event) => {
     if (event.source !== window || event.origin !== location.origin || event.data?.source !== 'credit-guard-dashboard') return;
-    if (event.data.type === 'ready') {
+    if (event.data.type === 'reset') {
+      try { await guard.clearApprovals(); } catch (error) { console.warn('[CheckoutGuard] Reset not applied:', error.message); }
+    } else if (event.data.type === 'snapshot') {
+      snapshot = { monthlyBudget: event.data.monthlyBudget, currentSpent: event.data.currentSpent };
+      await applySnapshot();
+    } else if (event.data.type === 'ready') {
       ready = true;
       await deliver();
     } else if (event.data.type === 'purchase-saved' && offeredPurchases.has(event.data.id)) {
@@ -43,6 +55,16 @@
     }
   });
   guard.subscribePurchases(deliver);
+  // Popup edits or its Reset button must not leave the two sides showing different numbers.
+  guard.subscribe(async () => {
+    if (!snapshot) return;
+    try {
+      const settings = await guard.load();
+      if (guard.pence(settings.monthlyBudget) !== snapshot.monthlyBudget || guard.pence(settings.currentSpent) !== snapshot.currentSpent) {
+        await applySnapshot();
+      }
+    } catch (error) { console.warn('[CheckoutGuard] Could not check dashboard numbers:', error.message); }
+  });
   guard.subscribeCoolingItems(deliver);
   // Handshake works whether the extension or React starts listening first.
   window.postMessage({ source: 'checkout-guard-extension', type: 'bridge-ready' }, location.origin);

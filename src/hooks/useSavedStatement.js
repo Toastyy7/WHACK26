@@ -22,36 +22,31 @@ export default function useSavedStatement() {
     }
   }
 
-  useEffect(() => {
-    const ready = () => window.postMessage({ source: 'credit-guard-dashboard', type: 'ready' }, location.origin);
-    function onMessage(event) {
-      if (event.source !== window || event.origin !== location.origin || event.data?.source !== 'checkout-guard-extension') return;
-      if (event.data.type === 'bridge-ready') { ready(); return; }
-      if (event.data.type !== 'purchase') return;
-      try {
-        const next = receiveCheckout(window.localStorage, latest.current, event.data.purchase);
-        latest.current = next;
-        setSavedStatement(next);
-        setStorageError('');
-        window.postMessage({ source: 'credit-guard-dashboard', type: 'purchase-saved', id: event.data.purchase.id }, location.origin);
-      } catch {
-        setStorageError('A checkout could not be saved. It remains queued in the extension and will retry when browser storage is available.');
-      }
+  // Called by the extension bridge. Returns true only once the purchase is durably saved.
+  function receivePurchase(purchase) {
+    try {
+      const next = receiveCheckout(window.localStorage, latest.current, purchase);
+      latest.current = next;
+      setSavedStatement(next);
+      setStorageError('');
+      return true;
+    } catch {
+      setStorageError('A checkout could not be saved. It remains queued in the extension and will retry when browser storage is available.');
+      return false;
     }
+  }
+
+  // Keep other open dashboard tabs in step.
+  useEffect(() => {
     function onStorage(event) {
       if (event.key !== null && event.key !== 'credit-guard-statement-v1') return;
       const next = loadStatement(window.localStorage);
       latest.current = next;
       setSavedStatement(next);
     }
-    window.addEventListener('message', onMessage);
     window.addEventListener('storage', onStorage);
-    ready();
-    return () => {
-      window.removeEventListener('message', onMessage);
-      window.removeEventListener('storage', onStorage);
-    };
+    return () => window.removeEventListener('storage', onStorage);
   }, []);
 
-  return { savedStatement, updateSavedStatement, storageError };
+  return { savedStatement, updateSavedStatement, receivePurchase, storageError };
 }
