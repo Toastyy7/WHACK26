@@ -171,3 +171,23 @@ python scripts/check-statement-ocr.py
 ```
 
 Optional image file paths can be appended to check that your local examples reach review; they are not stored in the repository. The test also covers a generated scanned PDF and verifies that OCR makes no external requests.
+
+### Try Focus mode
+On Home, choose **Focus mode** beside “One thing at a time”. Use **Next** and **Back**
+to move at your own pace. **Close focus mode** or Escape returns to Home. The final
+step offers **Review recorded spending**, **Try a purchase amount**, or **Finish for
+now**. With a reset demo the first facts show £280.00 owed and £20.00 safe to spend;
+without current-month selected transactions, the spending step says “No transactions
+recorded”. Uploads remain subject to review before appearing here. No data leaves the
+device and Focus mode does not save a separate history.
+
+Automated Focus mode checks (after `npm run build`, using the browser-test Python
+environment): `python3 scripts/check-focus.py`. Set `CHROMIUM_PATH` if using an
+existing Chromium binary. This covers modal navigation, keyboard focus, reset,
+empty data, optional actions and mobile layout in both themes.
+
+Focus mode opens with “Take a breather.” and an optional breathing guide. Start
+plays an expanding/shrinking circle with four-second in/out prompts; Pause stops it.
+“Show my summary” skips the guide immediately. Closing, Escape, leaving the welcome
+step or Reset demo stops its timer. Both system and app reduced-motion settings keep
+the circle still while the words change. No breathing history is recorded.

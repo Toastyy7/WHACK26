@@ -1,6 +1,7 @@
 import React, { useState, useRef, useLayoutEffect } from 'react';
 import { createInitialAccount, getGaugeState } from './account.js';
 import AccountOverview from './components/AccountOverview.jsx';
+import FocusMode from './components/FocusMode.jsx';
 import SafeZoneGauge from './components/SafeZoneGauge.jsx';
 import ImpulseCoolingQueue from './components/ImpulseCoolingQueue.jsx';
 import RequestGrace from './components/RequestGrace.jsx';
@@ -42,6 +43,7 @@ export default function App({ session = {} }) {
   const { queue, addCoolingItem, dismissCoolingItem, resetCoolingQueue, coolingError } = useCoolingQueue(session.storage);
   const [statementKey, setStatementKey] = useState(0);
   const heading = useRef(null);
+  const purchasePanel = useRef(null);
   const [account, setAccount] = useState(createInitialAccount);
   // The signed-in person's name in titles ("Sam"); guests get "you" wording.
   const name = session.user ? session.user.username.charAt(0).toUpperCase() + session.user.username.slice(1) : null;
@@ -133,8 +135,11 @@ export default function App({ session = {} }) {
       <div key={resetKey}>
         {/* Keep screens mounted so navigating home preserves the request and preview. */}
         <div hidden={page !== 'home'}>
+          <FocusMode account={displayedAccount} transactions={savedStatement?.result.transactions ?? []} month={month}
+            onReview={() => navigate('statements')}
+            onTryPurchase={() => { purchasePanel.current?.scrollIntoView({ block: 'center' }); purchasePanel.current?.querySelector('input')?.focus(); }} />
           <AccountOverview account={displayedAccount} detailed={view === 'detailed'} monthlyOutgoing={adjustment.outgoing} balanceFigure={display.balanceFigure} />
-          <SafeZoneGauge account={displayedAccount} balanceFigure={display.balanceFigure} />
+          <div ref={purchasePanel}><SafeZoneGauge account={displayedAccount} balanceFigure={display.balanceFigure} /></div>
           <ImpulseCoolingQueue
             items={queue.items}
             savings={queue.savings}
