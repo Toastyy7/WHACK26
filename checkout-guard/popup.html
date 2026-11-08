@@ -15,22 +15,23 @@
     </label>
   </header>
   <main>
-    <section class="card" aria-label="Monthly budget preview">
-      <div class="budget-summary"><span>Left to spend this month</span><span id="percentDisplay">—</span></div>
+    <section class="card" aria-label="Safe to spend">
+      <div class="budget-summary"><span>Safe to spend</span></div>
       <p id="remainingAmount" class="remaining-val">—</p>
-      <div id="budgetMeter" class="progress-bar" role="meter" aria-label="Monthly budget spent" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+      <div id="budgetMeter" class="progress-bar" role="meter" aria-label="Safe limit used" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
         <div id="budgetProgress" class="progress-fill" data-zone="safe"></div>
       </div>
       <p id="budgetStatus" role="status"></p>
+      <p id="owedDetail"></p>
     </section>
     <form id="settingsForm">
       <fieldset id="settingsFields" disabled>
-        <legend>Your monthly budget</legend>
-        <label for="monthlyBudget">Monthly budget (£)</label>
+        <legend>Your numbers</legend>
+        <label for="monthlyBudget">Safe limit (£)</label>
         <input type="number" id="monthlyBudget" min="0.01" max="9999999.99" step="0.01" inputmode="decimal" required aria-describedby="budgetHint">
-        <label for="currentSpent">Current month spend (£)</label>
+        <label for="currentSpent">You owe (£)</label>
         <input type="number" id="currentSpent" min="0" max="9999999.99" step="0.01" inputmode="decimal" required aria-describedby="budgetHint">
-        <p id="budgetHint">While the dashboard is open, these come from it. Continuing at checkout adds the purchase here and on the dashboard.</p>
+        <p id="budgetHint">While the dashboard is open these come from it automatically. Continuing at checkout adds the order to what you owe.</p>
         <label for="cooldownSeconds">Reflection pause</label>
         <select id="cooldownSeconds">
           <option value="10">10 seconds · quick demo</option>

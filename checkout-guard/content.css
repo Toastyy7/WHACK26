@@ -73,7 +73,8 @@
   font: 12px/1.5 system-ui, sans-serif !important;
   color: #475569 !important;
 }
-#checkout-guard-overlay #cg-budget-status {
+#checkout-guard-overlay #cg-budget-status,
+#checkout-guard-overlay .cg-detail {
   margin: 8px 0 0 !important;
   font: 13px/1.5 system-ui, sans-serif !important;
   color: #334155 !important;

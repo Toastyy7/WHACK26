@@ -51,9 +51,10 @@ flowchart LR
 - **All amounts are integer pence** (`28000` = £280). Pounds only exist at the edges: typed input is parsed by `parsePoundsToPence` and displayed with `formatMoney`. No floating-point money maths.
 - **Balance = amount owed.** Purchases from this month (statement rows, manual entries, checkouts from the extension) are **added** to the starting balance, like spending on a real card. The what-if preview uses the same direction, so a £50 preview and a real £50 purchase show the same number. Removing a transaction undoes it.
 - **Only the current calendar month counts** (browser local time). Older months, unknown dates and removed rows are ignored. The total is recalculated each time from the transaction list, never kept as a running total, so a refresh can't double-count.
-- **Gauge bands** (dashboard): green below your target (default 30%), amber from the target up to 50%, red at 50% or more, plus "Credit limit exceeded" above 100%. These are interface bands, **not** a credit-score prediction.
-- **Budget bands** (extension): green below 80% of the monthly budget, amber up to 100%, red above. The real percentage is never capped; only the bar's width is.
-- **One headline number: "Left to spend this month"** = monthly budget − this month's spending, never below £0 (with "£X over your budget" when over). The dashboard and both extension popups use exactly these words and this maths, so a person with dyscalculia never has to reconcile two different figures. Monthly budget = credit limit × target (default £300). While the dashboard is open, the extension takes its budget and spending from it.
+- **One money model, one headline number: "Safe to spend".** The *safe limit* is the chosen target share of the card limit (30% of £1,000 = £300). *Safe to spend* = safe limit − what you owe (£300 − £280 = **£20.00**), never below £0; past it, the app says "£X over your safe limit". The dashboard, the checkout popup and the toolbar popup all use exactly these words and this maths (`getGaugeState` in `src/account.js`, `impact` in `checkout-guard/core.js`). `test/extension-contract.test.js` fails if they ever differ. Built for people with dyscalculia: no second figure to reconcile.
+- **No percentages on screen.** One bar (share of the safe limit used, never past full) plus words. Screen readers get the same words.
+- **Colour bands, same on both sides:** green while you owe less than 80% of the safe limit ("Within your safe limit"), amber from 80% up to the limit ("Close to your safe limit"), red over it ("Over your safe limit"). The dashboard also says "Over your card limit" above the card limit. These are interface bands, **not** a credit-score prediction.
+- **Shared numbers:** the dashboard sends the extension its safe limit and what you owe. While a dashboard tab is open, those always win: if the toolbar popup's numbers are edited or reset, they snap back. With no dashboard open, the extension uses its own saved numbers and adds each Continue to what you owe.
 - **Money always shows pence** (`£280.00`, never `£280.5`), on both sides.
 
 ## Dashboard
@@ -62,8 +63,8 @@ React 19 and Vite 7, with no router and no state library. `App.jsx` holds the sh
 
 | Feature | What it does | Main files |
 |---|---|---|
-| Account overview | Headline **Left to spend this month** (same number as the extension), then **Owed on card** (starting balance + this month's purchases) of the credit limit. | `AccountOverview.jsx`, `account.js`, `statements/monthlyBalance.js` |
-| Safe-zone gauge | Percentage of the limit used, colour band and a plain-language label. The what-if purchase preview never changes the account. | `SafeZoneGauge.jsx`, `PurchaseProjection.jsx` |
+| Safe to spend (top card) | Headline **Safe to spend**, one bar, a status in words, and "You owe £X of your £Y safe limit. Card limit £Z." Same number and words as the extension. What you owe = starting balance + this month's purchases. | `AccountOverview.jsx`, `account.js`, `statements/monthlyBalance.js` |
+| Try a purchase first | Type an amount to see "After this: £X safe to spend" or "£X over your safe limit". Never changes the account. | `SafeZoneGauge.jsx`, `PurchaseProjection.jsx` |
 | Reflection queue | Checkouts paused by the extension, kept for 30 minutes. "I don't need this" removes an item and adds it to **Total Impulse Money Saved**. | `ImpulseCoolingQueue.jsx`, `coolingQueue.js`, `hooks/useCoolingQueue.js` |
 | Request Grace | Draft → edit → review → disclaimer and consent → send → status updates. The decision is simulated at random and doesn't predict a real lender. | `RequestGrace.jsx`, `grace.js` |
 | Statement analysis | Upload a text-based GBP bank statement PDF (or load the demo statement). Rows are extracted locally, categorised and reconciled against the statement's own total. You can change categories, include/exclude rows and add transactions manually. | `StatementAnalysis.jsx`, `AddTransactionForm.jsx`, `statements/*` |
@@ -177,9 +178,9 @@ The account itself (balance, limit, target, support request) lives in memory onl
 
 | Command | Covers |
 |---|---|
-| `npm test` | 38 Node unit tests: money parsing, gauge bands, balance maths, statement parsing and dates, storage, checkout sync, cooling queue, extension core (Chrome and Firefox storage, budgets, approvals, snapshot) and the extension ↔ dashboard contract. |
+| `npm test` | 40 Node unit tests: money parsing, gauge bands, balance maths, statement parsing and dates, storage, checkout sync, cooling queue, extension core (Chrome and Firefox storage, budgets, approvals, snapshot) and the extension ↔ dashboard contract. |
 | `npm run lint:extension` | Mozilla `web-ext lint` on `checkout-guard/`. |
-| `npm run test:browser` | Playwright + real Chromium, about 1 minute: the dashboard flows on the built `dist/` (served from a sub-folder), extension popup behaviour with simulated storage, detection fixtures (Amazon, Shopify/GamerSupps, product pages, hidden tabs), the toolbar popup, and **the real extension loaded next to the dashboard** checking the shared budget, the same "left to spend" number on both sides, Continue, shop approval and Leave → reflection queue. Fails on any JavaScript error in the page. |
+| `npm run test:browser` | Playwright + real Chromium, about 1 minute: the dashboard flows on the built `dist/` (served from a sub-folder), extension popup behaviour with simulated storage, detection fixtures (Amazon, Shopify/GamerSupps, product pages, hidden tabs), the toolbar popup, and **the real extension loaded next to the dashboard** checking the same "safe to spend" number on both sides, Continue, shop approval, Reset demo, the toolbar popup snapping back to the dashboard's numbers, and Leave → reflection queue. Fails on any JavaScript error in the page. |
 | `npm run pack:extension` | Unsigned ZIP in `web-ext-artifacts/`. |
 
 GitHub Actions (`.github/workflows/check.yml`) runs all of these on every push and pull request. It also checks that `dist/` was rebuilt and committed. CI only reads; it never pushes or deploys.
@@ -197,7 +198,7 @@ GitHub Actions (`.github/workflows/check.yml`) runs all of these on every push a
 index.html                  page shell + extension marker <meta name="checkout-guard-dashboard">
 src/main.jsx                starts React
 src/App.jsx                 layout, shared state, navigation, reset
-src/account.js              demo account, pounds→pence parsing, gauge bands
+src/account.js              demo account, pounds→pence parsing, safe-to-spend maths
 src/grace.js                Request Grace status steps
 src/coolingQueue.js         reflection queue rules + storage
 src/components/             one file per panel (see Dashboard table)

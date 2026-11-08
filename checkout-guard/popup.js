@@ -38,21 +38,22 @@ document.addEventListener('DOMContentLoaded', () => {
     const meter = find('budgetMeter');
     if (!settings) {
       find('remainingAmount').textContent = '—';
-      find('percentDisplay').textContent = 'Check amounts';
-      find('budgetStatus').textContent = 'Enter a positive budget and a non-negative spend, with up to two decimal places.';
+      find('owedDetail').textContent = '';
+      find('budgetStatus').textContent = 'Check amounts: enter a safe limit above £0 and what you owe, with up to two decimal places.';
       find('budgetProgress').style.width = '0%';
       meter.setAttribute('aria-valuenow', '0');
-      meter.setAttribute('aria-valuetext', 'Enter valid amounts to calculate budget usage.');
+      meter.setAttribute('aria-valuetext', 'Enter valid amounts to see what is safe to spend.');
       return null;
     }
     const result = guard.impact(settings);
     find('remainingAmount').textContent = guard.money(result.remaining);
-    find('percentDisplay').textContent = `${guard.percent(result.percentage)} spent`;
+    // Same sentence as the dashboard's overview card.
+    find('owedDetail').textContent = `You owe ${guard.money(guard.pence(settings.currentSpent))} of your ${guard.money(guard.pence(settings.monthlyBudget))} safe limit.`;
     find('budgetStatus').textContent = result.label;
     find('budgetProgress').style.width = `${result.width}%`;
     find('budgetProgress').dataset.zone = result.zone;
-    meter.setAttribute('aria-valuenow', String(result.width));
-    meter.setAttribute('aria-valuetext', `${guard.percent(result.percentage)} spent. ${result.label}`);
+    meter.setAttribute('aria-valuenow', String(Math.round(result.width)));
+    meter.setAttribute('aria-valuetext', result.label);
     return settings;
   }
   function apply(settings) {

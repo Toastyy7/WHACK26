@@ -90,8 +90,7 @@ h2 {
 }
 .overview {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
-  gap: 20px;
+  gap: 10px;
   padding: 24px;
   background: var(--brand-blue);
   border-top: 4px solid var(--brand-red);
@@ -216,10 +215,6 @@ button:disabled {
 .badge[class*='zone-'] {
   color: var(--zone-text);
   background: var(--zone-background);
-}
-.gauge-legend {
-  font-size: 0.85rem;
-  color: var(--muted);
 }
 .badge {
   display: inline-block;
@@ -365,7 +360,9 @@ td select { min-width: 210px; margin: 0; }
 .transaction-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 10px; }
 .transaction-actions strong { white-space: nowrap; }
 
-.balance-adjustment { font-size: 0.85rem; margin-top: 8px; max-width: 32rem; }
+.overview .gauge { margin: 6px 0 0; background: rgba(255, 255, 255, 0.25); }
+.overview .badge { justify-self: start; margin: 0; }
+.overview-detail { margin: 0; font-size: 0.95rem; }
 
 .add-transaction { margin: 24px 0; padding: 20px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
 .add-transaction fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }

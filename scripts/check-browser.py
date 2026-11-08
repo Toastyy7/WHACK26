@@ -103,13 +103,15 @@ try:
         overview = page.get_by_role('region', name='Account overview')
         projection = page.locator('#projection')
         expect(overview).to_contain_text('£280')
-        expect(meter).to_have_attribute('aria-valuenow', '28')
-        for purchase, percentage, zone in [('20', '30%', 'amber'), ('50', '33%', 'amber'), ('220', '50%', 'red'), ('800', '108%', 'red')]:
+        expect(meter).to_have_attribute('aria-valuenow', '93')  # £280 owed of a £300 safe limit
+        expect(overview).to_contain_text('Safe to spend£20.00')
+        for purchase, words, zone in [('10', '£10.00 safe to spend', 'amber'), ('20', '£0.00 safe to spend', 'amber'),
+                                      ('50', '£30.00 over your safe limit', 'red'), ('800', '£780.00 over your safe limit', 'red')]:
             amount.fill(purchase)
-            expect(projection).to_contain_text(percentage)
+            expect(projection).to_contain_text('After this: ' + words)
             expect(projection.locator('.badge')).to_have_class(f'badge zone-{zone}')
             expect(overview).to_contain_text('£280')  # a preview never changes the account
-        expect(projection).to_contain_text('Credit limit exceeded')
+        expect(projection).to_contain_text('Over your card limit')
         for invalid in ['-1', '12.345', 'not money']:
             amount.fill(invalid)
             expect(projection).to_contain_text('Enter pounds')
@@ -128,7 +130,7 @@ try:
         expect(page.get_by_text('Request received · awaiting review')).to_be_visible()
         page.get_by_role('button', name='Reset demo', exact=True).click()
         expect(amount).to_have_value('')
-        expect(meter).to_have_attribute('aria-valuenow', '28')
+        expect(meter).to_have_attribute('aria-valuenow', '93')  # £280 owed of a £300 safe limit
         page.set_viewport_size({'width': 375, 'height': 900})
         amount.fill('50')
         assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
@@ -163,7 +165,8 @@ try:
         expect(checkout.locator('#cg-order-amount')).to_have_text('£100.00')
         checkout.evaluate('window.__setSettings({currentSpent: 250})')
         expect(checkout.locator('.cg-gauge-fill')).to_have_class('cg-gauge-fill danger')
-        expect(checkout.locator('#cg-budget-status')).to_contain_text('£50.00 over')
+        expect(checkout.locator('#cg-remaining')).to_have_text('£50.00 over your safe limit')
+        expect(checkout.locator('#cg-budget-status')).to_have_text('Over your safe limit')
         checkout.evaluate('window.__setSettings({isEnabled: false})')
         expect(checkout.locator('#checkout-guard-overlay')).to_have_count(0)
         checkout.evaluate('window.__setSettings({isEnabled: true})')
@@ -184,7 +187,7 @@ try:
             checkout.locator('#cg-purchase-input').fill('-1')
             expect(checkout.locator('#cg-purchase-input')).to_have_attribute('aria-invalid', 'true')
             checkout.locator('#cg-purchase-input').fill('50')
-            expect(checkout.locator('#cg-remaining')).to_have_text('£130.00')
+            expect(checkout.locator('#cg-remaining')).to_have_text('£130.00 safe to spend')
             expect(checkout.locator('#cg-order-amount')).to_have_text('£50.00')
         # Removing checkout signals must close the dialog on SPA navigation.
         checkout.evaluate("document.querySelectorAll('input[autocomplete^=\"cc-\"], #submitOrderBtn, #order-total').forEach(el => el.remove()); history.pushState({}, '', '/products')")
@@ -243,11 +246,13 @@ try:
         popup = extension.new_page()
         popup.goto(base + '/checkout-guard/popup.html')
         expect(popup.locator('#saveBtn')).to_be_enabled()
-        spent = popup.get_by_label('Current month spend (£)')
-        budget = popup.get_by_label('Monthly budget (£)')
-        for spend, percentage, remaining, zone in [('120', '40% spent', '£180.00', 'safe'), ('240', '80% spent', '£60.00', 'warning'), ('360', '120% spent', '£0.00', 'danger')]:
+        spent = popup.get_by_label('You owe (£)')
+        budget = popup.get_by_label('Safe limit (£)')
+        for spend, detail, remaining, zone in [('120', 'You owe £120.00 of your £300.00 safe limit.', '£180.00', 'safe'),
+                                               ('240', 'You owe £240.00 of your £300.00 safe limit.', '£60.00', 'warning'),
+                                               ('360', 'You owe £360.00 of your £300.00 safe limit.', '£0.00', 'danger')]:
             spent.fill(spend)
-            expect(popup.locator('#percentDisplay')).to_have_text(percentage)
+            expect(popup.locator('#owedDetail')).to_have_text(detail)
             expect(popup.locator('#remainingAmount')).to_have_text(remaining)
             expect(popup.locator('#budgetProgress')).to_have_attribute('data-zone', zone)
         popup.evaluate('window.__failWrite = true')
@@ -260,7 +265,7 @@ try:
         popup.reload()
         expect(spent).to_have_value('360')
         budget.fill('0')
-        expect(popup.locator('#percentDisplay')).to_have_text('Check amounts')
+        expect(popup.locator('#budgetStatus')).to_contain_text('Check amounts')
         popup.get_by_role('switch').uncheck()
         expect(popup.locator('#guardStatus')).to_have_text('Guard off')
         assert popup.evaluate("JSON.parse(localStorage.getItem('test-settings')).isEnabled") is False
@@ -281,7 +286,7 @@ try:
         plain = context.new_page()
         plain.goto(base + '/checkout-guard/popup.html')
         expect(plain.locator('#statusToast')).to_contain_text('Preview mode')
-        plain.get_by_label('Current month spend (£)').fill('250')
+        plain.get_by_label('You owe (£)').fill('250')
         plain.locator('#saveBtn').click()
         expect(plain.locator('#statusToast')).to_contain_text('not saved')
         assert not errors, errors
@@ -313,7 +318,8 @@ try:
         shop = real.new_page()
         shop.goto(base + '/checkout-guard/test-checkout.html')
         expect(shop.get_by_role('dialog')).to_be_visible(timeout=10000)
-        expect(shop.locator('#cg-current-spent')).to_have_text('£0.00 of £300.00')  # dashboard numbers, not extension defaults
+        expect(shop.locator('#cg-current-spent')).to_have_text('You owe £280.00 of your £300.00 safe limit.')  # dashboard numbers, not extension defaults
+        expect(shop.locator('#cg-left-now')).to_have_text('£20.00')
         expect(shop.locator('#cg-proceed')).to_be_enabled(timeout=20000)  # real 15 s reflection pause
         shop.locator('#cg-proceed').click()
         expect(shop.get_by_role('dialog')).to_have_count(0)
@@ -324,10 +330,10 @@ try:
         other = real.new_page()
         other.goto(base.replace('127.0.0.1', 'localhost') + '/checkout-guard/test-checkout.html')
         expect(other.get_by_role('dialog')).to_be_visible(timeout=10000)
-        expect(other.locator('#cg-current-spent')).to_have_text('£69.99 of £300.00')
+        expect(other.locator('#cg-current-spent')).to_have_text('You owe £349.99 of your £300.00 safe limit.')
         # One number on both sides: £300 budget − £69.99 spent.
-        expect(other.locator('#cg-left-now')).to_have_text('£230.01')
-        expect(dash_overview).to_contain_text('Left to spend this month£230.01')
+        expect(other.locator('#cg-left-now')).to_have_text('£0.00')
+        expect(dash_overview).to_contain_text('Safe to spend£0.00')
         other.locator('#cg-step-away').click()
         expect(dash.get_by_text('Paused from')).to_have_count(2, timeout=10000)  # demo item + this checkout
         # Reset demo must make the approved shop pause again (live demos repeat the flow).
@@ -335,12 +341,23 @@ try:
         dash.wait_for_timeout(500)
         shop.reload()
         expect(shop.get_by_role('dialog')).to_be_visible(timeout=10000)
-        expect(shop.locator('#cg-left-now')).to_have_text('£300.00')  # reset numbers reach the extension too
+        expect(shop.locator('#cg-left-now')).to_have_text('£20.00')  # reset numbers reach the extension too
+        # The toolbar popup's Reset must not leave it disagreeing with the open dashboard.
+        manager = real.new_page()
+        manager.goto('chrome://extensions')
+        extension_id = manager.evaluate("new Promise(done => chrome.developerPrivate.getExtensionsInfo(list => done(list.find(e => e.name.startsWith('CheckoutGuard')).id)))")
+        manager.close()
+        toolbar = real.new_page()
+        toolbar.goto(f'chrome-extension://{extension_id}/popup.html')
+        expect(toolbar.locator('#remainingAmount')).to_have_text('£20.00')
+        toolbar.locator('#resetBtn').click()
+        expect(toolbar.locator('#remainingAmount')).to_have_text('£20.00', timeout=5000)  # not the £180.00 extension default
+        expect(toolbar.locator('#owedDetail')).to_have_text('You owe £280.00 of your £300.00 safe limit.')
         real.close()
         dash_server.shutdown()
         dash_server.server_close()
         assert not errors, errors
-        print('PASS real extension: shared budget, Continue updates both sides, approved shop stays quiet, Reset demo re-arms it, Leave checkout reaches the reflection queue')
+        print('PASS real extension: shared budget, Continue updates both sides, approved shop stays quiet, Reset demo re-arms it, popup Reset keeps dashboard numbers, Leave checkout reaches the reflection queue')
         print('PASS no browser JavaScript errors')
 finally:
     server.shutdown()

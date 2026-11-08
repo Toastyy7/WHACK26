@@ -43,9 +43,6 @@
   const money = (amount) => new Intl.NumberFormat('en-GB', {
     style: 'currency', currency: 'GBP',
   }).format(amount / 100);
-  const percent = (amount) => new Intl.NumberFormat('en-GB', {
-    maximumFractionDigits: 2,
-  }).format(amount) + '%';
 
   function impact(settings, purchase = 0) {
     const budget = pence(settings.monthlyBudget);
@@ -57,8 +54,9 @@
       projected, percentage, zone,
       width: Math.min(100, Math.max(0, percentage)),
       remaining: Math.max(0, budget - projected),
-      label: zone === 'danger' ? `${money(projected - budget)} over your budget.`
-        : zone === 'warning' ? 'Approaching spending limit.' : 'Within your budget.',
+      // Same words as the dashboard (src/account.js getGaugeState); a contract test checks this.
+      label: zone === 'danger' ? `${money(projected - budget)} over your safe limit`
+        : zone === 'warning' ? 'Close to your safe limit' : 'Within your safe limit',
     };
   }
 
@@ -196,7 +194,7 @@
     acknowledgePurchase: (id) => storage('remove', purchasePrefix + id),
     queueCoolingItem, pendingCoolingItems, subscribeCoolingItems, validCoolingItem,
     acknowledgeCoolingItem: (id) => storage('remove', coolingPrefix + id),
-    defaults, pence, parseGbp, normalise, validSettings, money, percent, impact,
+    defaults, pence, parseGbp, normalise, validSettings, money, impact,
     available: () => api() !== null,
     load: async () => normalise(await storage('get', defaults)),
     save: async (settings) => {

@@ -66,8 +66,8 @@ It's removed when Firefox closes, so load it again next time.
 
 1. Open the dashboard (5173, 4173 or 3000) in the **same browser profile** as the extension.
 2. In another tab open <http://127.0.0.1:5173/checkout-guard/test-checkout.html> (dev server) — a fake shop that never charges anything.
-3. The **Take a breath before you buy** popup appears, showing the dashboard's numbers (£0.00 of £300.00 on a fresh demo).
-4. Wait for the timer, click **Continue to checkout**. Both the dashboard and the extension now say **£230.01 left to spend this month**, "Owed on card" goes up by the order amount (£280.00 → £349.99), and the popup stays away on that shop for 30 minutes.
+3. The **Take a breath before you buy** popup appears with the dashboard's number: **Safe to spend now: £20.00** (fresh demo: you owe £280.00 of a £300.00 safe limit).
+4. Wait for the timer, click **Continue to checkout**. The dashboard and both extension popups now say **Safe to spend £0.00** and "You owe £349.99 of your £300.00 safe limit". The popup stays away on that shop for 30 minutes.
 5. Or click **Leave checkout** instead. The item appears in the dashboard's 30-minute reflection queue.
 
 ## 4. Run the checks
@@ -96,7 +96,7 @@ Package the extension as a ZIP (for sharing or Firefox signing): `npm run pack:e
 | Problem | Fix |
 |---|---|
 | `Port 5173 is already in use` | Another dev server is running. Stop it (Ctrl+C), or find it with `lsof -i :5173`. |
-| Extension shows a different "left to spend" from the dashboard (e.g. £120 of £300 spent) | The dashboard isn't open on 5173/4173/3000 in the same browser profile, or the extension wasn't reloaded after an update. |
+| Extension shows a different "safe to spend" from the dashboard | The dashboard isn't open on 5173/4173/3000 in the same browser profile, or the extension wasn't reloaded after an update. |
 | Purchase didn't reach the dashboard | It's queued in the extension and delivered when a dashboard tab opens (retries every 5 s). |
 | Popup doesn't appear on the test shop any more | You pressed Continue/× there in the last 30 minutes, so that shop is approved. Press **Reset demo** on the dashboard (or **Reset** in the toolbar popup) and reload the shop. In Chrome, if you reloaded the extension, refresh the dashboard tab first or Reset demo can't reach it. |
 | Dashboard and extension stopped syncing in Chrome after reloading the extension | Refresh the dashboard tab and the shop tab. |

@@ -30,12 +30,11 @@ export default function App() {
   const month = useCurrentMonth();
   const adjustment = monthlyBalance(account.balance, savedStatement?.result.transactions ?? [], month);
   const displayedAccount = { ...account, balance: adjustment.balance };
-  // Monthly budget = the chosen target share of the limit. Dashboard and extension
-  // both show "left to spend" = this budget minus this month's spending.
-  const monthlyBudget = getGaugeState(account.balance, account.limit, account.target).threshold;
+  // One money model: the extension gets the safe limit and what is owed, so both
+  // sides show the same "safe to spend" (safe limit − owed).
   useExtensionBridge({
-    monthlyBudget,
-    currentSpent: adjustment.outgoing,
+    monthlyBudget: getGaugeState(displayedAccount.balance, account.limit, account.target).threshold,
+    currentSpent: displayedAccount.balance,
     receivePurchase,
     receiveCoolingItem: addCoolingItem,
   });
@@ -101,7 +100,7 @@ export default function App() {
       <div key={resetKey}>
         {/* Keep screens mounted so navigating home preserves the request and preview. */}
         <div hidden={page !== 'home'}>
-          <AccountOverview account={displayedAccount} monthlyBudget={monthlyBudget} monthlyOutgoing={adjustment.outgoing} month={month} />
+          <AccountOverview account={displayedAccount} />
           <SafeZoneGauge account={displayedAccount} />
           <ImpulseCoolingQueue
             items={queue.items}

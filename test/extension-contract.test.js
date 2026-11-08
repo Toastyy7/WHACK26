@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
-import { parsePoundsToPence } from '../src/account.js';
+import { parsePoundsToPence, getGaugeState } from '../src/account.js';
+import { formatMoney } from '../src/utils/format.js';
 import { validCoolingItem } from '../src/coolingQueue.js';
 import { checkoutTransaction } from '../src/statements/checkoutSync.js';
 
@@ -33,5 +34,20 @@ test('every purchase the extension queues is one the dashboard accepts, and vice
     let dashboard = true;
     try { checkoutTransaction(purchase); } catch { dashboard = false; }
     assert.equal(guard.validPurchase(purchase), dashboard, JSON.stringify(purchase));
+  }
+});
+
+test('extension and dashboard show the same safe-to-spend number, colour and words', () => {
+  const colour = { safe: 'green', warning: 'amber', danger: 'red' };
+  const limit = 100000;
+  const target = 30;
+  for (const owed of [0, 20000, 23999, 24000, 28000, 30000, 30001, 34999, 90000]) {
+    const dashboard = getGaugeState(owed, limit, target);
+    // The extension receives exactly what the dashboard sends: safe limit and amount owed (pounds).
+    const extension = guard.impact({ monthlyBudget: (dashboard.threshold / 100).toFixed(2), currentSpent: (owed / 100).toFixed(2) });
+    assert.equal(extension.remaining, dashboard.safeToSpend, `remaining ${owed}`);
+    assert.equal(colour[extension.zone], dashboard.zone, `zone ${owed}`);
+    const words = dashboard.over ? `${formatMoney(dashboard.over)} over your safe limit` : dashboard.label;
+    assert.equal(extension.label, words, `label ${owed}`);
   }
 });

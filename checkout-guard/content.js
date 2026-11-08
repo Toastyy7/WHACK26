@@ -27,19 +27,19 @@
         <button type="button" id="cg-close" aria-label="Close preview">×</button>
         <div class="cg-badge">🛡️ CheckoutGuard</div>
         <h2 id="cg-modal-title" class="cg-title">Take a breath before you buy</h2>
-        <p id="cg-description" class="cg-subtitle">A quick look at how this order affects your monthly budget. Continuing records this amount in your dashboard as a planned transaction, not a confirmed payment.</p>
+        <p id="cg-description" class="cg-subtitle">Here is what this order would leave you. Continuing adds it to what you owe on the dashboard (as planned, not a confirmed payment).</p>
         <div class="cg-impact-card">
-          <div class="cg-impact-row"><span id="cg-order-label">Detected order:</span><strong id="cg-order-amount"></strong></div>
+          <div class="cg-impact-row"><span>Safe to spend now:</span><strong id="cg-left-now"></strong></div>
+          <div class="cg-impact-row"><span id="cg-order-label">This order:</span><strong id="cg-order-amount"></strong></div>
           <div id="cg-manual" hidden>
             <label for="cg-purchase-input">Purchase amount (£)</label>
             <input id="cg-purchase-input" inputmode="decimal" autocomplete="off" aria-describedby="cg-amount-note">
             <p id="cg-amount-note">We couldn't read a GBP order total. Enter it above to preview; other currencies need conversion to pounds.</p>
           </div>
-          <div class="cg-impact-row"><span>Left to spend this month:</span><strong id="cg-left-now"></strong></div>
-          <div class="cg-impact-row"><span>Already spent:</span><span id="cg-current-spent"></span></div>
-          <div class="cg-impact-row"><span>Left after this purchase:</span><strong id="cg-remaining"></strong></div>
-          <div class="cg-gauge-bar" role="meter" aria-label="Projected monthly budget used" aria-valuemin="0" aria-valuemax="100"><div class="cg-gauge-fill"></div></div>
+          <div class="cg-impact-row"><span>After it:</span><strong id="cg-remaining"></strong></div>
+          <div class="cg-gauge-bar" role="meter" aria-label="Safe limit used after this order" aria-valuemin="0" aria-valuemax="100"><div class="cg-gauge-fill"></div></div>
           <p id="cg-budget-status" role="status"></p>
+          <p id="cg-current-spent" class="cg-detail"></p>
         </div>
         <div class="cg-timer-box"><span id="cg-timer-label">Reflection pause:</span><span id="cg-timer-seconds" class="cg-timer-seconds" role="timer" aria-live="off"></span></div>
         <div id="cg-timer-status" role="status" class="cg-visually-hidden"></div>
@@ -66,10 +66,11 @@
       if (renderKey === lastRender) return;
       lastRender = renderKey;
       const purchase = total ?? manualAmount;
-      find('#cg-order-label').textContent = total === null ? 'Entered amount:' : 'Detected order:';
+      find('#cg-order-label').textContent = total === null ? 'Entered amount:' : 'This order:';
       find('#cg-order-amount').textContent = purchase === null ? 'Not available' : guard.money(purchase);
       find('#cg-left-now').textContent = guard.money(guard.impact(settings, 0).remaining);
-      find('#cg-current-spent').textContent = `${guard.money(guard.pence(settings.currentSpent))} of ${guard.money(guard.pence(settings.monthlyBudget))}`;
+      // Same sentence as the dashboard's overview card.
+      find('#cg-current-spent').textContent = `You owe ${guard.money(guard.pence(settings.currentSpent))} of your ${guard.money(guard.pence(settings.monthlyBudget))} safe limit.`;
       const meter = find('.cg-gauge-bar');
       const fill = find('.cg-gauge-fill');
       if (purchase === null) {
@@ -83,12 +84,14 @@
           : 'Enter a GBP total to see its impact.';
       } else {
         const result = guard.impact(settings, purchase);
-        find('#cg-remaining').textContent = guard.money(result.remaining);
+        const over = result.projected - guard.pence(settings.monthlyBudget);
+        find('#cg-remaining').textContent = over > 0 ? `${guard.money(over)} over your safe limit` : `${guard.money(result.remaining)} safe to spend`;
         fill.className = `cg-gauge-fill ${result.zone}`;
         fill.style.width = `${result.width}%`;
-        meter.setAttribute('aria-valuenow', String(result.width));
-        meter.setAttribute('aria-valuetext', `${guard.percent(result.percentage)} used. ${result.label}`);
-        find('#cg-budget-status').textContent = `${result.label} (${guard.percent(result.percentage)} used)`;
+        meter.setAttribute('aria-valuenow', String(Math.round(result.width)));
+        meter.setAttribute('aria-valuetext', result.label);
+        // The row above already shows the amount; match the dashboard's badge words.
+        find('#cg-budget-status').textContent = over > 0 ? 'Over your safe limit' : result.label;
       }
     }
 
