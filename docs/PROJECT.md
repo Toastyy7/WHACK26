@@ -302,3 +302,39 @@ plays an expanding/shrinking circle with four-second in/out prompts; Pause stops
 “Show my summary” skips the guide immediately. Closing, Escape, leaving the welcome
 step or Reset demo stops its timer. Both system and app reduced-motion settings keep
 the circle still while the words change. No breathing history is recorded.
+
+### Manual payment tracking
+`src/components/PaymentDue.jsx` adds a Home card for a separately entered positive
+amount due and calendar date. `src/paymentDue.js` validates integer pence and real
+ISO dates, stores only those fields, and counts calendar days without DST drift.
+`src/hooks/usePaymentDue.js` uses the existing per-user/guest storage scope with key
+`credit-guard-payment-due-v1`; it refreshes the day on focus and every minute and
+listens for changes from other tabs. Storage failures have an on-screen message.
+The details persist after refresh; Clear and Reset demo remove them. They never
+alter owed, safe-to-spend, extension sync or transactions and do not record payment
+completion or roll forward automatically. When present, Focus mode adds a separate
+payment step after what is owed. No server requests or notifications are added.
+
+### Accepted Grace updates the tracked payment
+When the demo request moves from reviewing to accepted, `advanceGraceRequest` in
+`src/grace.js` uses `extendPaymentDue` to add 14 calendar days after the later of
+today or the saved due date. It preserves the integer-pence amount due, card balance
+and safe-to-spend figures. The new date is saved using the existing payment storage
+and appears on Home and in Focus mode. Terminal decisions are no-ops; the App also
+guards repeated clicks before rendering so the same decision cannot extend twice.
+Declines and pending requests leave payment details alone. Acceptance with no
+payment details offers a link to the existing Home editor; it creates no amount
+or date and does not apply an extension later merely because details were added.
+Acceptance displays the applied date for the current visit. The payment date
+persists after refresh; the demo request status still resets on refresh as before.
+Reset demo clears both. Storage failures show that the date is available only for
+the visit. This is a simulated arrangement, not a lender's confirmation.
+
+### Statement reader loading recovery
+`src/statements/loadStatementReader.js` lazy-loads the reader and retries one failed
+module load through a distinct bundled module URL, bypassing a cached failure for
+the first entry point. The selected file stays in memory and the page is not
+reloaded. Cancellation or Reset prevents a pending load from starting a read. A second
+failure gives refresh/restart instructions and preserves any saved statement.
+Only module loading is retried; PDF parsing and OCR errors are not rerun. Both
+entry points are bundled for the offline demo. There is no CDN fallback.

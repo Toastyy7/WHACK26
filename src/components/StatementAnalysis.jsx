@@ -6,6 +6,7 @@ import AddTransactionForm from './AddTransactionForm.jsx';
 import { appendManualTransaction, importedTransactions } from '../statements/manualTransactions.js';
 import { getDemoStatement } from '../statements/demoStatement.js';
 import StatementReview from './StatementReview.jsx';
+import { loadStatementReader } from '../statements/loadStatementReader.js';
 
 export default function StatementAnalysis({ savedStatement, onSave, onClear, onViewHome, onSelect }) {
   // App owns saved results so Home and this screen always use the same transactions.
@@ -69,10 +70,14 @@ export default function StatementAnalysis({ savedStatement, onSave, onClear, onV
     setPendingFileName(file.name);
     setError('');
     setBusy(true);
+    setProgress('Loading statement reader…');
     try {
       if (!/\.(pdf|png|jpe?g)$/i.test(file.name)) throw new Error('Choose a PDF, JPG or PNG statement.');
       // Load the PDF reader only when needed, keeping the home screen lightweight.
-      const { readStatement } = await import('../statements/readPdf.js');
+      const { readStatement } = await loadStatementReader({
+        signal: controller.signal,
+        onRetry: () => { if (id === uploadId.current) setProgress('Retrying statement reader…'); },
+      });
       const extracted = await readStatement(file, { signal: controller.signal,
         onProgress: (message) => { if (id === uploadId.current) setProgress(message); } });
       if (id === uploadId.current) {

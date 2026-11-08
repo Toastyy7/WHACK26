@@ -2,6 +2,10 @@ import React, { useState, useRef, useLayoutEffect } from 'react';
 import { createInitialAccount, getGaugeState } from './account.js';
 import AccountOverview from './components/AccountOverview.jsx';
 import FocusMode from './components/FocusMode.jsx';
+import PaymentDue from './components/PaymentDue.jsx';
+import usePaymentDue from './hooks/usePaymentDue.js';
+import { localDay } from './paymentDue.js';
+import { advanceGraceRequest } from './grace.js';
 import SafeZoneGauge from './components/SafeZoneGauge.jsx';
 import ImpulseCoolingQueue from './components/ImpulseCoolingQueue.jsx';
 import RequestGrace from './components/RequestGrace.jsx';
@@ -48,6 +52,7 @@ export default function App({ session = {} }) {
   // The signed-in person's name in titles ("Sam"); guests get "you" wording.
   const name = session.user ? session.user.username.charAt(0).toUpperCase() + session.user.username.slice(1) : null;
   const month = useCurrentMonth();
+  const { payment, updatePayment, today, paymentError } = usePaymentDue(session.storage);
   const adjustment = monthlyBalance(account.balance, savedStatement?.result.transactions ?? [], month);
   const displayedAccount = { ...account, balance: adjustment.balance };
   // One money model: the extension gets the safe limit and what is owed, so both
@@ -66,6 +71,24 @@ export default function App({ session = {} }) {
   // useRef keeps the pending timeout ID without causing a render when it changes.
   // Keeping it here lets Reset cancel a submission started in RequestGrace.
   const timer = useRef(null);
+  const graceDecisionMade = useRef(false);
+  const paymentEditor = useRef(null);
+
+  function advanceGrace() {
+    // Guard synchronously too: two clicks before React renders must not reroll a
+    // decision or extend the same payment twice. Keep side effects out of setters.
+    if (graceDecisionMade.current) return;
+    const next = advanceGraceRequest(account.support, payment, localDay());
+    if (next.support === account.support) return;
+    if (['accepted', 'declined'].includes(next.support.status)) graceDecisionMade.current = true;
+    setAccount(state => ({ ...state, support: next.support }));
+    if (next.payment !== payment) updatePayment(next.payment);
+  }
+
+  function addPaymentDetails() {
+    navigate('home');
+    paymentEditor.current?.open();
+  }
 
   // Merge just the changed fields, keeping the rest of the account.
   // The callback receives the latest state, even if React queues several updates.
@@ -93,8 +116,10 @@ export default function App({ session = {} }) {
     // Discard a pending submission before restoring the demo fixture.
     clearTimeout(timer.current);
     timer.current = null;
+    graceDecisionMade.current = false;
     setAccount(createInitialAccount());
     resetCoolingQueue();
+    updatePayment(null);
     resetExtension();
     clearStatement();
     setPage('home');
@@ -135,10 +160,11 @@ export default function App({ session = {} }) {
       <div key={resetKey}>
         {/* Keep screens mounted so navigating home preserves the request and preview. */}
         <div hidden={page !== 'home'}>
-          <FocusMode account={displayedAccount} transactions={savedStatement?.result.transactions ?? []} month={month}
+          <FocusMode payment={payment} today={today} account={displayedAccount} transactions={savedStatement?.result.transactions ?? []} month={month}
             onReview={() => navigate('statements')}
             onTryPurchase={() => { purchasePanel.current?.scrollIntoView({ block: 'center' }); purchasePanel.current?.querySelector('input')?.focus(); }} />
           <AccountOverview account={displayedAccount} detailed={view === 'detailed'} monthlyOutgoing={adjustment.outgoing} balanceFigure={display.balanceFigure} />
+          <PaymentDue payment={payment} today={today} onSave={updatePayment} storageError={paymentError} editorRef={paymentEditor} />
           <div ref={purchasePanel}><SafeZoneGauge account={displayedAccount} balanceFigure={display.balanceFigure} /></div>
           <ImpulseCoolingQueue
             items={queue.items}
@@ -162,6 +188,10 @@ export default function App({ session = {} }) {
             account={account}
             updateAccount={updateAccount}
             timer={timer}
+            onAdvance={advanceGrace}
+            payment={payment}
+            paymentError={paymentError}
+            onAddPaymentDetails={addPaymentDetails}
           />
         </div>
         <div hidden={page !== 'statements'}>
