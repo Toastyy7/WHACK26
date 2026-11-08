@@ -70,6 +70,7 @@ React 19 and Vite 7, with no router and no state library. `App.jsx` holds the sh
 | Statement analysis | Upload a text-based GBP bank statement PDF (or load the demo statement). Rows are extracted locally, categorised and reconciled against the statement's own total. You can change categories, include/exclude rows and add transactions manually. | `StatementAnalysis.jsx`, `AddTransactionForm.jsx`, `statements/*` |
 | Home spending summary | This month's saved transactions on Home, with Remove/restore. | `HomeSpendingSummary.jsx` |
 | Demo controls | Presenter-only: starting balance, credit limit, target %. | `DemoControls.jsx` |
+| Accounts | **Log in / Create account / Log out / Continue without an account.** Header shows "Signed in as …" or "Guest". Each account's money data is kept separately in this browser; nothing financial goes to the server. Without a running server the app opens as a guest automatically. See [Accounts server](#accounts-server). | `AccountGate.jsx`, `AuthScreen.jsx`, `auth/*`, `server/*` |
 | ⚙ Settings, menu, reset | One Settings menu with switches for **Dark mode**, **Detailed view** and **Dyslexia-friendly font (OpenDyslexic)**, all remembered and kept across Reset demo. The font is bundled (works offline) and also switches the extension's popups. ☰ Menu for navigation; **Reset demo** clears everything else. | `SettingsMenu.jsx`, `NavigationMenu.jsx` |
 
 ### Statement import
@@ -154,6 +155,24 @@ The extension and dashboard each check incoming data with their own validators. 
 
 All of the dashboard's bridge code is in `src/hooks/useExtensionBridge.js`. To support a deployed dashboard, add its exact origin to the allowlist in `checkout-guard/sync.js`.
 
+## Accounts server
+
+`server/index.js` is a zero-dependency Node server (`npm run server`, port 4173). It serves `dist/` and a small JSON API. **Local demo only:** plain HTTP, never deploy as-is. Full design and reasoning: [BACKEND-PLAN.md](BACKEND-PLAN.md).
+
+| Method + path | Does |
+|---|---|
+| `GET /api/health` | Server is up |
+| `POST /api/register` `{username, password}` | Creates the account and logs in (`201`; `409` if the name is taken) |
+| `POST /api/login` `{username, password}` | Logs in (`401` "Username or password is wrong"; `429` after 5 failures in 15 min) |
+| `POST /api/logout` | Ends the session |
+| `GET /api/me` | Who's logged in (`401` if nobody) |
+
+- **Stored** in `server/data/users.json` (gitignored): user ID, lowercase username, **scrypt** password hash, and **SHA-256 hashes** of session tokens. No money data.
+- **Session cookie** `cg_session`: HttpOnly, SameSite=Lax, 7 days.
+- **Protection:** `POST` needs JSON and a same-site `Origin`; bodies ≤ 16 KB; unknown users and wrong passwords get the same answer and timing; files outside `dist/` are never served; a corrupt accounts file stops the server instead of being overwritten.
+- **In the browser** (`src/auth/`): `api.js` never throws (no server → "offline" → guest mode); `useAuth.js` holds the login state; `scopedStorage.js` prefixes the existing storage keys with `credit-guard-user:<id>:` per account (guests use the original keys); `AccountGate.jsx` picks the log-in screen or the dashboard and remounts it per account.
+- **The extension is unchanged.** It syncs with whichever account is open on the dashboard tab. Purchases made while logged out wait and go to the next account that opens the dashboard in that browser.
+
 ## Stored data
 
 **Dashboard (`localStorage`)**
@@ -166,6 +185,8 @@ All of the dashboard's bridge code is in `src/hooks/useExtensionBridge.js`. To s
 | `credit-guard-theme` | Light/dark choice | No |
 | `credit-guard-view` | Simple/Detailed view choice | No |
 | `credit-guard-font` | Normal/OpenDyslexic font choice | No |
+
+For a signed-in account, the first three keys are prefixed with `credit-guard-user:<user id>:` so each account has its own copy. Guests use them as shown. Display settings are shared by everyone on the browser.
 
 The account itself (balance, limit, target, support request) lives in memory only and goes back to the demo values when the page reloads.
 
@@ -183,7 +204,7 @@ The account itself (balance, limit, target, support request) lives in memory onl
 
 | Command | Covers |
 |---|---|
-| `npm test` | 40 Node unit tests: money parsing, gauge bands, balance maths, statement parsing and dates, storage, checkout sync, cooling queue, extension core (Chrome and Firefox storage, budgets, approvals, snapshot) and the extension ↔ dashboard contract. |
+| `npm test` | 53 Node tests, including the accounts server (real HTTP requests: register, login, logout, validation, origin/size checks, brute-force limit, hashing, path traversal, corrupt-file guard) and the browser accounts client: money parsing, gauge bands, balance maths, statement parsing and dates, storage, checkout sync, cooling queue, extension core (Chrome and Firefox storage, budgets, approvals, snapshot) and the extension ↔ dashboard contract. |
 | `npm run lint:extension` | Mozilla `web-ext lint` on `checkout-guard/`. |
 | `npm run test:browser` | Playwright + real Chromium, about 1 minute: the dashboard flows on the built `dist/` (served from a sub-folder), extension popup behaviour with simulated storage, detection fixtures (Amazon, Shopify/GamerSupps, product pages, hidden tabs), the toolbar popup, and **the real extension loaded next to the dashboard** checking the same "safe to spend" number on both sides, Continue, shop approval, Reset demo, the toolbar popup snapping back to the dashboard's numbers, and Leave → reflection queue. Fails on any JavaScript error in the page. |
 | `npm run pack:extension` | Unsigned ZIP in `web-ext-artifacts/`. |
@@ -192,7 +213,7 @@ GitHub Actions (`.github/workflows/check.yml`) runs all of these on every push a
 
 ## Privacy and security
 
-- No network requests, no analytics, no accounts, no real payments or support messages.
+- No analytics, no real payments or support messages. The only network requests are to the optional local accounts server, and they carry only usernames, passwords (stored only as hashes) and session cookies, **never money data**.
 - The extension stores only amounts, shop hostnames, page titles and the font choice, never URLs, query strings or card details.
 - Only the two font files are web-accessible (needed to show OpenDyslexic on shop pages).
 - Bridge messages are restricted to the same tab and origin, and the extension bridges only to localhost dashboard ports.
@@ -202,7 +223,10 @@ GitHub Actions (`.github/workflows/check.yml`) runs all of these on every push a
 
 ```
 index.html                  page shell + extension marker <meta name="checkout-guard-dashboard">
-src/main.jsx                starts React
+src/main.jsx                starts React with AccountGate
+src/AccountGate.jsx         log-in screen or dashboard (per account / guest)
+src/auth/                   accounts client: api.js, useAuth.js, scopedStorage.js
+server/                     optional accounts server (index.js, store.js, tests)
 src/App.jsx                 layout, shared state, navigation, reset
 src/account.js              demo account, pounds→pence parsing, safe-to-spend maths
 src/grace.js                Request Grace status steps
@@ -228,6 +252,7 @@ project-brief.md            pitch, demo script, judge Q&A
 ## Known limits
 
 - Prototype only: simulated account, random Grace decisions, no lender integration.
+- Accounts are a local demo: plain HTTP, no password reset, email or account deletion. Money data is per browser, not synced between devices.
 - The dashboard's account settings (balance, limit, target) reset on reload. Only transactions, the queue and the theme are saved.
 - Checkout detection is strict to avoid false alarms, so some shops won't trigger it. Unknown totals fall back to typing the amount.
 - Sync needs the dashboard open on a localhost port in the same browser profile.

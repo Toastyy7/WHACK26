@@ -61,6 +61,8 @@ Use one React app with shared fixture data and a reset button. Choose the stack 
 
 ## Questions judges might ask
 
+- **Do you store people's financial data?** No. Accounts only hold a username, a securely hashed password and a login session. Balances, purchases and statements stay on the user's device, separately for each account.
+
 - **Does 30% change someone’s score?** The prototype uses a sample customer target. It predicts the share of this card’s limit in use after a purchase. Credit scoring and reporting depend on the model and reported data. The proposed UK pitch drops the FICO weighting statistic.
 - **Does a support request buy 14 extra days?** It opens a case for lender review. The prototype shows receipt, remaining amount due, and a written reply preference.
 - **Why use AI?** It’s optional for drafting a message. An editable template covers the core need and works offline for the demo.

@@ -4,16 +4,17 @@ import {
   loadCoolingQueue, saveCoolingQueue,
 } from '../coolingQueue.js';
 
-export default function useCoolingQueue() {
+// `storage` is the current account's storage (src/auth/scopedStorage.js); defaults to the browser's.
+export default function useCoolingQueue(storage = window.localStorage) {
   const [queue, setQueue] = useState(() => {
-    try { return loadCoolingQueue(window.localStorage) ?? createInitialCoolingQueue(); }
+    try { return loadCoolingQueue(storage) ?? createInitialCoolingQueue(); }
     catch { return createInitialCoolingQueue(); }
   });
   const [coolingError, setCoolingError] = useState('');
   const latest = useRef(queue);
 
   function persist(next) {
-    saveCoolingQueue(window.localStorage, next);
+    saveCoolingQueue(storage, next);
     latest.current = next;
     setQueue(next);
     setCoolingError('');
@@ -43,9 +44,9 @@ export default function useCoolingQueue() {
   // Keep other open dashboard tabs in step.
   useEffect(() => {
     function onStorage(event) {
-      if (event.key !== null && event.key !== coolingStorageKey) return;
+      if (event.key !== null && event.key !== (storage.keyFor?.(coolingStorageKey) ?? coolingStorageKey)) return;
       try {
-        const next = loadCoolingQueue(window.localStorage) ?? createInitialCoolingQueue();
+        const next = loadCoolingQueue(storage) ?? createInitialCoolingQueue();
         latest.current = next;
         setQueue(next);
       } catch { setCoolingError('The saved reflection queue could not be read.'); }

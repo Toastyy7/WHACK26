@@ -2,9 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import { receiveCheckout } from '../statements/checkoutSync.js';
 import { loadStatement, saveStatement } from '../statements/storage.js';
 
-export default function useSavedStatement() {
+// `storage` is the current account's storage (src/auth/scopedStorage.js); defaults to the browser's.
+export default function useSavedStatement(storage = window.localStorage) {
   const [savedStatement, setSavedStatement] = useState(() => {
-    try { return loadStatement(window.localStorage); } catch { return null; }
+    try { return loadStatement(storage); } catch { return null; }
   });
   const [storageError, setStorageError] = useState('');
   const latest = useRef(savedStatement);
@@ -13,7 +14,7 @@ export default function useSavedStatement() {
     latest.current = statement;
     setSavedStatement(statement);
     try {
-      saveStatement(window.localStorage, statement);
+      saveStatement(storage, statement);
       setStorageError('');
     } catch {
       setStorageError(statement
@@ -25,7 +26,7 @@ export default function useSavedStatement() {
   // Called by the extension bridge. Returns true only once the purchase is durably saved.
   function receivePurchase(purchase) {
     try {
-      const next = receiveCheckout(window.localStorage, latest.current, purchase);
+      const next = receiveCheckout(storage, latest.current, purchase);
       latest.current = next;
       setSavedStatement(next);
       setStorageError('');
@@ -39,8 +40,8 @@ export default function useSavedStatement() {
   // Keep other open dashboard tabs in step.
   useEffect(() => {
     function onStorage(event) {
-      if (event.key !== null && event.key !== 'credit-guard-statement-v1') return;
-      const next = loadStatement(window.localStorage);
+      if (event.key !== null && event.key !== (storage.keyFor?.('credit-guard-statement-v1') ?? 'credit-guard-statement-v1')) return;
+      const next = loadStatement(storage);
       latest.current = next;
       setSavedStatement(next);
     }

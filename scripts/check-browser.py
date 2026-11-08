@@ -16,7 +16,11 @@ from threading import Thread
 import os
 import re
 import shutil
+import socket
+import subprocess
 import tempfile
+import time
+import urllib.request
 
 from playwright.sync_api import sync_playwright, expect
 
@@ -394,6 +398,65 @@ try:
         dash_server.server_close()
         assert not errors, errors
         print('PASS real extension: shared budget, Continue updates both sides, approved shop stays quiet, Reset demo re-arms it, popup Reset keeps dashboard numbers, font reaches both popups, Leave checkout reaches the reflection queue')
+
+        # Accounts: the real Node server (npm run server) with a throwaway accounts file.
+        with socket.socket() as probe:
+            probe.bind(('127.0.0.1', 0))
+            accounts_port = probe.getsockname()[1]
+        accounts_dir = tempfile.mkdtemp()
+        accounts = subprocess.Popen(['node', str(ROOT / 'server' / 'index.js')], cwd=ROOT,
+                                    env={**os.environ, 'PORT': str(accounts_port), 'ACCOUNTS_FILE': os.path.join(accounts_dir, 'users.json')},
+                                    stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+        try:
+            accounts_url = f'http://127.0.0.1:{accounts_port}'
+            for _ in range(50):
+                try:
+                    urllib.request.urlopen(accounts_url + '/api/health', timeout=1)
+                    break
+                except OSError:
+                    time.sleep(0.1)
+            web = p.chromium.launch(executable_path=os.environ.get('CHROMIUM_PATH') or shutil.which('chromium'), headless=True, args=['--no-sandbox'])
+            site = web.new_page()
+            site.on('pageerror', lambda error: errors.append(str(error)))
+            site.goto(accounts_url + '/')
+            expect(site.get_by_role('heading', name='Log in')).to_be_visible()
+
+            def create(name, password):
+                site.get_by_role('button', name='Create an account').click()
+                site.get_by_label('Username').fill(name)
+                site.get_by_label('Password', exact=True).fill(password)
+                site.get_by_role('button', name='Create account').click()
+                expect(site.get_by_text(f'Signed in as {name}')).to_be_visible()
+
+            def log_out():
+                site.get_by_role('button', name='Log out').click()
+                expect(site.get_by_role('heading', name='Log in')).to_be_visible()
+
+            saved = site.get_by_text('Total Impulse Money Saved: £69.99')
+            create('alice', 'alice password')
+            site.get_by_role('button', name=re.compile("I don't need this")).first.click()
+            expect(saved).to_be_visible()
+            log_out()
+            create('bob', 'bob password')
+            expect(saved).to_have_count(0)  # bob doesn't see alice's data
+            log_out()
+            site.get_by_label('Username').fill('alice')
+            site.get_by_label('Password', exact=True).fill('wrong password')
+            site.get_by_role('button', name='Log in', exact=True).click()
+            expect(site.get_by_role('alert')).to_have_text('Username or password is wrong.')
+            site.get_by_label('Password', exact=True).fill('alice password')
+            site.get_by_role('button', name='Log in', exact=True).click()
+            expect(saved).to_be_visible()  # alice's data is back
+            site.reload()
+            expect(site.get_by_text('Signed in as alice')).to_be_visible()  # session survives a reload
+            log_out()
+            site.get_by_role('button', name='Continue without an account').click()
+            expect(site.get_by_text('Guest', exact=True)).to_be_visible()
+            web.close()
+            print('PASS accounts: register, separate data per account, wrong password, log in again, session survives reload, log out, guest')
+        finally:
+            accounts.terminate()
+            accounts.wait(timeout=10)
         print('PASS no browser JavaScript errors')
 finally:
     server.shutdown()

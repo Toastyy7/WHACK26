@@ -462,3 +462,12 @@ td select { min-width: 210px; margin: 0; }
 :root[data-font='dyslexic'] h2,
 :root[data-font='dyslexic'] .overview strong { letter-spacing: 0; line-height: 1.3; }
 .settings-panel:focus { outline: none; }  /* only focused by clicks inside it; each switch has its own ring */
+
+/* Accounts: log-in screen and the header's account chip. */
+.auth { display: grid; place-items: center; min-height: 100vh; padding: 24px 16px; }
+.auth-card { width: min(440px, 100%); display: grid; gap: 12px; }
+.auth-card h1 { margin: 0; }
+.auth-card form { display: grid; gap: 8px; }
+.auth-hint { margin: -4px 0 4px; font-size: 0.85rem; color: var(--muted); }
+.auth-switch { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 4px 0 0; }
+.account-chip { align-self: center; font-size: 0.9rem; color: var(--muted); }

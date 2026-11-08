@@ -17,7 +17,9 @@ import useCoolingQueue from './hooks/useCoolingQueue.js';
 import useExtensionBridge, { resetExtension } from './hooks/useExtensionBridge.js';
 
 // App owns the data shared by the panels below. Props pass that data to each panel.
-export default function App() {
+// `session` comes from AccountGate: the signed-in user (or null for a guest), their own
+// browser storage, and log-in/log-out actions. Without it the app runs as a guest.
+export default function App({ session = {} }) {
   // useState remembers a value between renders; its setter updates the screen.
   // Passing the function here creates the starting account on the first render.
   // Navigation changes the visible screen without discarding account data or drafts.
@@ -25,8 +27,8 @@ export default function App() {
   // Like the theme, these display choices are kept across Reset demo.
   const [view, setView] = useState(() => loadSetting('credit-guard-view', ['simple', 'detailed'], 'simple'));
   const [font, setFont] = useState(() => loadSetting('credit-guard-font', ['default', 'dyslexic'], 'default'));
-  const { savedStatement, updateSavedStatement, receivePurchase, storageError } = useSavedStatement();
-  const { queue, addCoolingItem, dismissCoolingItem, resetCoolingQueue, coolingError } = useCoolingQueue();
+  const { savedStatement, updateSavedStatement, receivePurchase, storageError } = useSavedStatement(session.storage);
+  const { queue, addCoolingItem, dismissCoolingItem, resetCoolingQueue, coolingError } = useCoolingQueue(session.storage);
   const [statementKey, setStatementKey] = useState(0);
   const heading = useRef(null);
   const [account, setAccount] = useState(createInitialAccount);
@@ -90,6 +92,13 @@ export default function App() {
           <NavigationMenu page={page} onNavigate={navigate} />
           <SettingsMenu view={view} onView={setView} font={font} onFont={setFont} />
           <button className="secondary" onClick={reset}>Reset demo</button>
+          {session.user ? (<>
+            <span className="account-chip">Signed in as <strong>{session.user.username}</strong></span>
+            <button className="secondary" onClick={session.onLogOut}>Log out</button>
+          </>) : session.onLogIn && (<>
+            <span className="account-chip">{session.offline ? 'Guest (accounts offline)' : 'Guest'}</span>
+            {!session.offline && <button className="secondary" onClick={session.onLogIn}>Log in</button>}
+          </>)}
         </div>
       </header>
       <div className="intro">

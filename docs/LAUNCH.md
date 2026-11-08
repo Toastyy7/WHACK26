@@ -6,6 +6,7 @@ Three ways to run it, from quickest to most complete. Everything runs locally: n
 |---|---|---|
 | Show the dashboard with no setup | [Offline demo](#1-offline-demo-no-node) | Python 3 |
 | Work on the code | [Dev server](#2-dev-server) | Node 20.19+ or 22.12+ |
+| Accounts (register / log in / log out) | [Accounts server](#2b-accounts-server) | Node (nothing extra) |
 | Show dashboard + extension together | [Dev server](#2-dev-server) + [extension](#3-load-the-checkoutguard-extension) | Chrome/Chromium or Firefox 142+ |
 
 ---
@@ -41,6 +42,23 @@ To refresh the offline demo after changing code:
 ```sh
 npm run build   # rewrites dist/ – commit it, CI checks it is up to date
 ```
+
+## 2b. Accounts server
+
+Accounts need the small Node server in `server/` (no extra packages). It serves the built app **and** the accounts API on port 4173.
+
+```sh
+npm run build      # the server serves dist/
+npm run server     # http://127.0.0.1:4173 – log in / create an account
+```
+
+Working on the UI with accounts: run `npm run server` in one terminal and `npm run dev` in another. The dev server on 5173 forwards `/api` to 4173.
+
+Two-device demo: `npm run server -- --lan`, then open `http://<this-laptop's-IP>:4173` on the other device (plain HTTP, demo only).
+
+- **No server running?** The app goes straight into **guest mode** (header: "Guest (accounts offline)") and works exactly as before. The Python offline demo always runs as guest.
+- Each account's money data stays **in this browser**, separate per account. Guests use the original storage, so older demo data appears there.
+- Accounts are saved in `server/data/users.json` (gitignored). Delete it to remove all accounts.
 
 ## 3. Load the CheckoutGuard extension
 
@@ -104,4 +122,7 @@ Package the extension as a ZIP (for sharing or Firefox signing): `npm run pack:e
 | `npm ci` errors about the lockfile | You're on an old branch. Pull, then run `npm ci` again. |
 | Blank page | You opened a `file://` URL. Use one of the servers above. |
 | Want a clean demo | Click **Reset demo** in the dashboard header. |
+| Stuck on "Log in" / "Accounts aren't available" | The accounts server isn't running. Start `npm run server`, or click **Continue without an account**. |
+| "Too many attempts" | 5 wrong passwords for that username: wait 15 minutes or restart the server. |
+| Forgot a demo password | Stop the server, delete `server/data/users.json` (removes **all** accounts), start it again. |
 | Dyslexia-friendly font, dark mode or detailed view | **⚙ Settings** in the dashboard header. The font also switches the extension's popups (refresh the shop tab if it was already open). |
