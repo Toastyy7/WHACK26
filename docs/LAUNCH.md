@@ -67,7 +67,7 @@ It's removed when Firefox closes, so load it again next time.
 1. Open the dashboard (5173, 4173 or 3000) in the **same browser profile** as the extension.
 2. In another tab open <http://127.0.0.1:5173/checkout-guard/test-checkout.html> (dev server) — a fake shop that never charges anything.
 3. The **Take a breath before you buy** popup appears, showing the dashboard's numbers (£0.00 of £300.00 on a fresh demo).
-4. Wait for the timer, click **Continue to checkout**. The dashboard balance goes up by the order amount (£280 → £349.99), and the popup stays away on that shop for 30 minutes.
+4. Wait for the timer, click **Continue to checkout**. Both the dashboard and the extension now say **£230.01 left to spend this month**, "Owed on card" goes up by the order amount (£280.00 → £349.99), and the popup stays away on that shop for 30 minutes.
 5. Or click **Leave checkout** instead. The item appears in the dashboard's 30-minute reflection queue.
 
 ## 4. Run the checks
@@ -96,7 +96,7 @@ Package the extension as a ZIP (for sharing or Firefox signing): `npm run pack:e
 | Problem | Fix |
 |---|---|
 | `Port 5173 is already in use` | Another dev server is running. Stop it (Ctrl+C), or find it with `lsof -i :5173`. |
-| Extension popup shows £120 of £300 instead of the dashboard's numbers | The dashboard isn't open on 5173/4173/3000 in the same browser profile, or the extension wasn't reloaded after an update. |
+| Extension shows a different "left to spend" from the dashboard (e.g. £120 of £300 spent) | The dashboard isn't open on 5173/4173/3000 in the same browser profile, or the extension wasn't reloaded after an update. |
 | Purchase didn't reach the dashboard | It's queued in the extension and delivered when a dashboard tab opens (retries every 5 s). |
 | Popup never appears on a real shop | Detection is deliberately strict to avoid false alarms. Use the test checkout page, or check `chrome://extensions` → CheckoutGuard → **Errors**. |
 | `npm ci` errors about the lockfile | You're on an old branch. Pull, then run `npm ci` again. |

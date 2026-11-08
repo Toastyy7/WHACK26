@@ -53,7 +53,8 @@ flowchart LR
 - **Only the current calendar month counts** (browser local time). Older months, unknown dates and removed rows are ignored. The total is recalculated each time from the transaction list, never kept as a running total, so a refresh can't double-count.
 - **Gauge bands** (dashboard): green below your target (default 30%), amber from the target up to 50%, red at 50% or more, plus "Credit limit exceeded" above 100%. These are interface bands, **not** a credit-score prediction.
 - **Budget bands** (extension): green below 80% of the monthly budget, amber up to 100%, red above. The real percentage is never capped; only the bar's width is.
-- **Shared numbers:** while the dashboard is open, the extension's monthly budget = credit limit × target (default £300), and its "already spent" = this month's dashboard spending.
+- **One headline number: "Left to spend this month"** = monthly budget − this month's spending, never below £0 (with "£X over your budget" when over). The dashboard and both extension popups use exactly these words and this maths, so a person with dyscalculia never has to reconcile two different figures. Monthly budget = credit limit × target (default £300). While the dashboard is open, the extension takes its budget and spending from it.
+- **Money always shows pence** (`£280.00`, never `£280.5`), on both sides.
 
 ## Dashboard
 
@@ -61,7 +62,7 @@ React 19 and Vite 7, with no router and no state library. `App.jsx` holds the sh
 
 | Feature | What it does | Main files |
 |---|---|---|
-| Account overview | Current balance (starting balance + this month's purchases) and credit limit. | `AccountOverview.jsx`, `account.js`, `statements/monthlyBalance.js` |
+| Account overview | Headline **Left to spend this month** (same number as the extension), then **Owed on card** (starting balance + this month's purchases) of the credit limit. | `AccountOverview.jsx`, `account.js`, `statements/monthlyBalance.js` |
 | Safe-zone gauge | Percentage of the limit used, colour band and a plain-language label. The what-if purchase preview never changes the account. | `SafeZoneGauge.jsx`, `PurchaseProjection.jsx` |
 | Reflection queue | Checkouts paused by the extension, kept for 30 minutes. "I don't need this" removes an item and adds it to **Total Impulse Money Saved**. | `ImpulseCoolingQueue.jsx`, `coolingQueue.js`, `hooks/useCoolingQueue.js` |
 | Request Grace | Draft → edit → review → disclaimer and consent → send → status updates. The decision is simulated at random and doesn't predict a real lender. | `RequestGrace.jsx`, `grace.js` |
@@ -73,7 +74,7 @@ React 19 and Vite 7, with no router and no state library. `App.jsx` holds the sh
 ### Statement import
 
 - PDF.js runs in the browser with its bundled worker. The file is read in memory and never uploaded or saved; only the extracted rows are saved.
-- The importer finds separate outgoing/incoming columns ("Paid out/Paid in", "Money out/Money in", "Debit/Credit", "Withdrawals/Deposits") and uses each amount's position to skip incoming payments and running balances.
+- The importer finds separate outgoing/incoming columns ("Paid out/Paid in", "Money out/Money in", "Payments out/in", Nationwide's "£Out/£In", "Debit/Credit", "Withdrawals/Deposits") and uses each amount's position to skip incoming payments and running balances.
 - Limits: 20 MB, 100 pages, text PDFs only. Scanned, password-protected and non-GBP statements aren't supported.
 - A detected summary total is compared with the extracted total. A mismatch or missing total is shown for review. A match is a useful check, not a guarantee.
 - Dates use the printed year, or the statement period when the bank leaves the year out. They never silently use the current year.
@@ -92,6 +93,7 @@ One Manifest V3 folder for Chrome and Firefox 142+. No bundler, no background wo
 | `popup.html/.css/.js` | Toolbar popup: budget, spend, pause length, on/off. |
 | `content.css` | Styles scoped to the injected popup, with reduced-motion support. |
 | `test-checkout.html` | Fake shop for testing. It never submits a payment. |
+| `icons/` | Toolbar and extensions-page icon (16/32/48/128 px). |
 
 ### Detection (`detect.js`)
 
@@ -173,9 +175,9 @@ The account itself (balance, limit, target, support request) lives in memory onl
 
 | Command | Covers |
 |---|---|
-| `npm test` | 36 Node unit tests: money parsing, gauge bands, balance maths, statement parsing and dates, storage, checkout sync, cooling queue, extension core (Chrome and Firefox storage, budgets, approvals, snapshot) and the extension ↔ dashboard contract. |
+| `npm test` | 38 Node unit tests: money parsing, gauge bands, balance maths, statement parsing and dates, storage, checkout sync, cooling queue, extension core (Chrome and Firefox storage, budgets, approvals, snapshot) and the extension ↔ dashboard contract. |
 | `npm run lint:extension` | Mozilla `web-ext lint` on `checkout-guard/`. |
-| `npm run test:browser` | Playwright + real Chromium, about 1 minute: the dashboard flows on the built `dist/` (served from a sub-folder), extension popup behaviour with simulated storage, detection fixtures (Amazon, Shopify/GamerSupps, product pages, hidden tabs), the toolbar popup, and **the real extension loaded next to the dashboard** checking the shared budget, Continue, shop approval and Leave → reflection queue. Fails on any JavaScript error in the page. |
+| `npm run test:browser` | Playwright + real Chromium, about 1 minute: the dashboard flows on the built `dist/` (served from a sub-folder), extension popup behaviour with simulated storage, detection fixtures (Amazon, Shopify/GamerSupps, product pages, hidden tabs), the toolbar popup, and **the real extension loaded next to the dashboard** checking the shared budget, the same "left to spend" number on both sides, Continue, shop approval and Leave → reflection queue. Fails on any JavaScript error in the page. |
 | `npm run pack:extension` | Unsigned ZIP in `web-ext-artifacts/`. |
 
 GitHub Actions (`.github/workflows/check.yml`) runs all of these on every push and pull request. It also checks that `dist/` was rebuilt and committed. CI only reads; it never pushes or deploys.

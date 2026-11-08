@@ -325,6 +325,9 @@ try:
         other.goto(base.replace('127.0.0.1', 'localhost') + '/checkout-guard/test-checkout.html')
         expect(other.get_by_role('dialog')).to_be_visible(timeout=10000)
         expect(other.locator('#cg-current-spent')).to_have_text('£69.99 of £300.00')
+        # One number on both sides: £300 budget − £69.99 spent.
+        expect(other.locator('#cg-left-now')).to_have_text('£230.01')
+        expect(dash_overview).to_contain_text('Left to spend this month£230.01')
         other.locator('#cg-step-away').click()
         expect(dash.get_by_text('Paused from')).to_have_count(2, timeout=10000)  # demo item + this checkout
         real.close()

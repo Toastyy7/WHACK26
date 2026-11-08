@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { createInitialAccount } from './account.js';
+import { createInitialAccount, getGaugeState } from './account.js';
 import AccountOverview from './components/AccountOverview.jsx';
 import SafeZoneGauge from './components/SafeZoneGauge.jsx';
 import ImpulseCoolingQueue from './components/ImpulseCoolingQueue.jsx';
@@ -30,9 +30,11 @@ export default function App() {
   const month = useCurrentMonth();
   const adjustment = monthlyBalance(account.balance, savedStatement?.result.transactions ?? [], month);
   const displayedAccount = { ...account, balance: adjustment.balance };
-  // Extension budget = the target amount; extension spend = this month's dashboard spending.
+  // Monthly budget = the chosen target share of the limit. Dashboard and extension
+  // both show "left to spend" = this budget minus this month's spending.
+  const monthlyBudget = getGaugeState(account.balance, account.limit, account.target).threshold;
   useExtensionBridge({
-    monthlyBudget: Math.ceil((account.limit * account.target) / 100),
+    monthlyBudget,
     currentSpent: adjustment.outgoing,
     receivePurchase,
     receiveCoolingItem: addCoolingItem,
@@ -98,7 +100,7 @@ export default function App() {
       <div key={resetKey}>
         {/* Keep screens mounted so navigating home preserves the request and preview. */}
         <div hidden={page !== 'home'}>
-          <AccountOverview account={displayedAccount} monthlyOutgoing={adjustment.outgoing} month={month} />
+          <AccountOverview account={displayedAccount} monthlyBudget={monthlyBudget} monthlyOutgoing={adjustment.outgoing} month={month} />
           <SafeZoneGauge account={displayedAccount} />
           <ImpulseCoolingQueue
             items={queue.items}

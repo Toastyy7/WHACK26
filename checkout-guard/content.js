@@ -35,8 +35,9 @@
             <input id="cg-purchase-input" inputmode="decimal" autocomplete="off" aria-describedby="cg-amount-note">
             <p id="cg-amount-note">We couldn't read a GBP order total. Enter it above to preview; other currencies need conversion to pounds.</p>
           </div>
+          <div class="cg-impact-row"><span>Left to spend this month:</span><strong id="cg-left-now"></strong></div>
           <div class="cg-impact-row"><span>Already spent:</span><span id="cg-current-spent"></span></div>
-          <div class="cg-impact-row"><span>Remaining after purchase:</span><strong id="cg-remaining"></strong></div>
+          <div class="cg-impact-row"><span>Left after this purchase:</span><strong id="cg-remaining"></strong></div>
           <div class="cg-gauge-bar" role="meter" aria-label="Projected monthly budget used" aria-valuemin="0" aria-valuemax="100"><div class="cg-gauge-fill"></div></div>
           <p id="cg-budget-status" role="status"></p>
         </div>
@@ -67,6 +68,7 @@
       const purchase = total ?? manualAmount;
       find('#cg-order-label').textContent = total === null ? 'Entered amount:' : 'Detected order:';
       find('#cg-order-amount').textContent = purchase === null ? 'Not available' : guard.money(purchase);
+      find('#cg-left-now').textContent = guard.money(guard.impact(settings, 0).remaining);
       find('#cg-current-spent').textContent = `${guard.money(guard.pence(settings.currentSpent))} of ${guard.money(guard.pence(settings.monthlyBudget))}`;
       const meter = find('.cg-gauge-bar');
       const fill = find('.cg-gauge-fill');

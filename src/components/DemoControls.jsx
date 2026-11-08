@@ -37,7 +37,7 @@ export default function DemoControls({
       <summary>Demo controls</summary>
       <div className="controls">
         <MoneyControl
-          label="Starting balance before this month’s transactions (£)"
+          label="Owed at the start of this month, before this month’s purchases (£)"
           amount={account.balance}
           minimum={0}
           onSave={(balance) => updateAccount({ balance })}
