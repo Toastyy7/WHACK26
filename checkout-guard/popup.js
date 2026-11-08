@@ -10,6 +10,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let saved = { ...guard.defaults };
   let dirty = false;
   let busy = false;
+  let display = guard.displayPreferences();
 
   function notice(message, error = false) {
     find('statusToast').textContent = message;
@@ -39,6 +40,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!settings) {
       find('remainingAmount').textContent = '—';
       find('owedDetail').textContent = '';
+      find('extraDetail').hidden = true;
       find('budgetStatus').textContent = 'Check amounts: enter a safe limit above £0 and what you owe, with up to two decimal places.';
       find('budgetProgress').style.width = '0%';
       meter.setAttribute('aria-valuenow', '0');
@@ -46,6 +48,8 @@ document.addEventListener('DOMContentLoaded', () => {
       return null;
     }
     const result = guard.impact(settings);
+    find('extraDetail').hidden = display.view !== 'detailed';
+    find('extraDetail').textContent = `${Math.round(result.percentage)}% of your safe limit used.`;
     find('remainingAmount').textContent = guard.money(result.remaining);
     // Same sentence as the dashboard's overview card.
     find('owedDetail').textContent = `You owe ${guard.money(guard.pence(settings.currentSpent))} of your ${guard.money(guard.pence(settings.monthlyBudget))} safe limit.`;
@@ -137,13 +141,16 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!dirty) apply(settings);
     } catch { notice('Could not read updated settings. Your edits are still here.', true); }
   });
-  // Follow the dashboard's Settings → Dyslexia-friendly font.
-  function applyFont() {
+  // Follow every dashboard display choice, including while this popup is open.
+  async function applyDisplay() {
     if (!guard.available()) return;
-    guard.getFont().then((font) => { document.documentElement.dataset.font = font; })
-      .catch(() => { /* keep the normal font */ });
+    try {
+      display = await guard.getDisplayPreferences();
+      guard.applyDisplayPreferences(document.documentElement, display);
+      preview();
+    } catch { notice('Could not load display choices. Reopen this popup to try again.', true); }
   }
-  applyFont();
-  guard.subscribeFont(applyFont);
+  applyDisplay();
+  guard.subscribeDisplayPreferences(applyDisplay);
   load();
 });

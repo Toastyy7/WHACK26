@@ -70,7 +70,15 @@ React 19 and Vite 7, with no router and no state library. `App.jsx` holds the sh
 | Statement analysis | Upload a text-based GBP bank statement PDF (or load the demo statement). Rows are extracted locally, categorised and reconciled against the statement's own total. You can change categories, include/exclude rows and add transactions manually. | `StatementAnalysis.jsx`, `AddTransactionForm.jsx`, `statements/*` |
 | Home spending summary | This month's saved transactions on Home, with Remove/restore. | `HomeSpendingSummary.jsx` |
 | Demo controls | Presenter-only: starting balance, credit limit, target %. | `DemoControls.jsx` |
-| ⚙ Settings, menu, reset | One Settings menu with switches for **Dark mode**, **Detailed view** and **Dyslexia-friendly font (OpenDyslexic)**, all remembered and kept across Reset demo. The font is bundled (works offline) and also switches the extension's popups. ☰ Menu for navigation; **Reset demo** clears everything else. | `SettingsMenu.jsx`, `NavigationMenu.jsx` |
+| ⚙ Settings, menu, reset | A large centred Settings dialog with **Dark mode**, **Detailed view** and **Dyslexia-friendly font (OpenDyslexic)**. **Advanced Mode** adds Standard/Larger/Largest text, comfortable spacing and reduced motion. All choices are remembered and kept across Reset demo; turning Advanced Mode off suspends its effects without forgetting the choices. Every effective display choice also applies to the extension’s toolbar and checkout overlay. The font is bundled for offline use. ☰ Menu for navigation; **Reset demo** clears everything else. | `SettingsMenu.jsx`, `preferences.js`, `NavigationMenu.jsx` |
+
+### Display preferences
+
+- The native modal is centred, scrolls within small screens, keeps Tab/Shift+Tab focus inside, closes with Escape/Done/× and returns focus to Settings.
+- Advanced Mode changes reading comfort only. It never changes amounts, gauge bands, the reflection timer or money rules. Text sizes are 100%, 112.5% and 125%; labels use plain words. Comfortable spacing gives controls more room. Reduced motion removes decorative animation and transitions; the device preference is always respected, even with Advanced Mode off.
+- Theme, font and Simple/Detailed view always apply. Advanced text size, spacing and motion apply only while Advanced Mode is on. Detailed view optionally shows percentages in both extension surfaces; the default stays percentage-free.
+- Preferences save as a versioned object, migrating the old theme/font/view keys. Unrecognised values fall back to safe defaults. When browser storage is unavailable, the dialog says the choices apply for this visit.
+- The dashboard sends effective preferences on start-up, handshake and each change. The extension validates them, stores them separately from money and updates both open popups through storage events. Closed popups pick them up next time. Styling stays inside the extension UI, leaving the shop page alone.
 
 ### Statement import
 
@@ -139,7 +147,7 @@ All messages are `window.postMessage` within the dashboard tab. Both sides check
 | dash → ext | `purchase-saved` `{id}` | Saved for good, so the extension deletes its pending copy. |
 | ext → dash | `cooling-item` `{version, id, title, store, amount, savedAt, expiresAt}` | Added to the reflection queue, then acknowledged. |
 | dash → ext | `cooling-item-saved` `{id}` | As above. |
-| dash → ext | `preferences` `{font}` | Font choice (`default`/`dyslexic`). Both extension popups switch font. Sent on start-up and when it changes. |
+| dash → ext | `preferences` `{font, display}` | `display` contains validated theme, font, view, advancedMode, textSize, spacing and reduceMotion. Both extension surfaces update live. Legacy font-only messages still work. Sent on start-up, handshake and changes. |
 | dash → ext | `reset` | Reset demo was pressed. The extension forgets approved shops. |
 | dash → ext | `snapshot` `{monthlyBudget, currentSpent}` (pence) | The extension takes these as its budget and spend. Sent on start-up and whenever they change. |
 
@@ -163,9 +171,9 @@ All of the dashboard's bridge code is in `src/hooks/useExtensionBridge.js`. To s
 | `credit-guard-statement-v1` | Imported, manual and checkout transactions, plus filename and selections | Yes |
 | `credit-guard-cooling-v1` | Reflection queue items and money saved | Yes |
 | `credit-guard-checkout-receipts-v1` | IDs of received purchases (prevents replays) | No, on purpose |
-| `credit-guard-theme` | Light/dark choice | No |
-| `credit-guard-view` | Simple/Detailed view choice | No |
-| `credit-guard-font` | Normal/OpenDyslexic font choice | No |
+| `credit-guard-personalisation-v1` | Version 1 display preferences; theme, font, view and retained Advanced Mode choices | No |
+
+The legacy `credit-guard-theme`, `credit-guard-view` and `credit-guard-font` keys are read only for migration on the first visit after updating.
 
 The account itself (balance, limit, target, support request) lives in memory only and goes back to the demo values when the page reloads.
 
@@ -177,15 +185,16 @@ The account itself (balance, limit, target, support request) lives in memory onl
 | `checkoutGuard.purchase.<id>` | A purchase waiting for the dashboard |
 | `checkoutGuard.cooling.<id>` | A paused checkout waiting for the dashboard |
 | `checkoutGuard.approved.<hostname>` | Time until which that shop won't pause again (30 min) |
-| `checkoutGuard.font` | `default` or `dyslexic`, set by the dashboard's Settings |
+| `checkoutGuard.font` | Legacy-compatible `default` or `dyslexic` preference |
+| `checkoutGuard.preferences` | Effective display preferences, set by the dashboard; survives both Reset buttons |
 
 ## Testing and CI
 
 | Command | Covers |
 |---|---|
-| `npm test` | 40 Node unit tests: money parsing, gauge bands, balance maths, statement parsing and dates, storage, checkout sync, cooling queue, extension core (Chrome and Firefox storage, budgets, approvals, snapshot) and the extension ↔ dashboard contract. |
+| `npm test` | 47 Node unit tests: money parsing, gauge bands, balance maths, statement parsing and dates, storage, checkout sync, cooling queue, extension core (Chrome and Firefox storage, budgets, approvals, snapshot), display migration/validation/persistence, and the money and display contracts between extension and dashboard. |
 | `npm run lint:extension` | Mozilla `web-ext lint` on `checkout-guard/`. |
-| `npm run test:browser` | Playwright + real Chromium, about 1 minute: the dashboard flows on the built `dist/` (served from a sub-folder), extension popup behaviour with simulated storage, detection fixtures (Amazon, Shopify/GamerSupps, product pages, hidden tabs), the toolbar popup, and **the real extension loaded next to the dashboard** checking the same "safe to spend" number on both sides, Continue, shop approval, Reset demo, the toolbar popup snapping back to the dashboard's numbers, and Leave → reflection queue. Fails on any JavaScript error in the page. |
+| `npm run test:browser` | Playwright + real Chromium, about 1 minute: the dashboard flows on the built `dist/` (served from a sub-folder), Advanced Mode, modal keyboard/mobile behaviour, preference persistence, extension display changes and popup behaviour with simulated storage, detection fixtures (Amazon, Shopify/GamerSupps, product pages, hidden tabs), the toolbar popup, and **the real extension loaded next to the dashboard** checking the same "safe to spend" number on both sides, Continue, shop approval, Reset demo, the toolbar popup snapping back to the dashboard's numbers, and Leave → reflection queue. Fails on any JavaScript error in the page. |
 | `npm run pack:extension` | Unsigned ZIP in `web-ext-artifacts/`. |
 
 GitHub Actions (`.github/workflows/check.yml`) runs all of these on every push and pull request. It also checks that `dist/` was rebuilt and committed. CI only reads; it never pushes or deploys.
@@ -193,7 +202,7 @@ GitHub Actions (`.github/workflows/check.yml`) runs all of these on every push a
 ## Privacy and security
 
 - No network requests, no analytics, no accounts, no real payments or support messages.
-- The extension stores only amounts, shop hostnames, page titles and the font choice, never URLs, query strings or card details.
+- The extension stores only amounts, shop hostnames, page titles and display choices, never URLs, query strings or card details.
 - Only the two font files are web-accessible (needed to show OpenDyslexic on shop pages).
 - Bridge messages are restricted to the same tab and origin, and the extension bridges only to localhost dashboard ports.
 - All data read from storage or messages is validated before use. Invalid stored settings fall back to defaults; a failed read never replaces your saved budget with a guess.
@@ -204,6 +213,7 @@ GitHub Actions (`.github/workflows/check.yml`) runs all of these on every push a
 index.html                  page shell + extension marker <meta name="checkout-guard-dashboard">
 src/main.jsx                starts React
 src/App.jsx                 layout, shared state, navigation, reset
+src/preferences.js          display validation, migration, storage and effective advanced choices
 src/account.js              demo account, pounds→pence parsing, safe-to-spend maths
 src/grace.js                Request Grace status steps
 src/coolingQueue.js         reflection queue rules + storage
@@ -228,7 +238,7 @@ project-brief.md            pitch, demo script, judge Q&A
 ## Known limits
 
 - Prototype only: simulated account, random Grace decisions, no lender integration.
-- The dashboard's account settings (balance, limit, target) reset on reload. Only transactions, the queue and the theme are saved.
+- The dashboard's account settings (balance, limit, target) reset on reload. Transactions, the queue and all display preferences are saved.
 - Checkout detection is strict to avoid false alarms, so some shops won't trigger it. Unknown totals fall back to typing the amount.
 - Sync needs the dashboard open on a localhost port in the same browser profile.
 - A shop approval is read when the page loads. If it expires while the page stays open, that's ignored until the next page load.

@@ -196,6 +196,50 @@
     event.addListener(handle);
     return () => event.removeListener(handle);
   }
+  // Same allowlist as src/preferences.js; guarded by test/display-contract.test.js.
+  // Kept apart from money, so Reset demo never resets accessibility choices.
+  const preferencesKey = 'checkoutGuard.preferences';
+  function displayPreferences(value) {
+    const input = value && typeof value === 'object' ? value : {};
+    const advancedMode = input.advancedMode === true;
+    return {
+      theme: ['light', 'dark'].includes(input.theme) ? input.theme : 'light',
+      font: fonts.includes(input.font) ? input.font : 'default',
+      view: ['simple', 'detailed'].includes(input.view) ? input.view : 'simple',
+      advancedMode,
+      textSize: advancedMode && ['large', 'extra-large'].includes(input.textSize) ? input.textSize : 'normal',
+      spacing: advancedMode && input.spacing === 'comfortable' ? 'comfortable' : 'standard',
+      reduceMotion: advancedMode && input.reduceMotion === true,
+    };
+  }
+  async function getDisplayPreferences() {
+    const data = await storage('get', [preferencesKey, fontKey]);
+    const preferences = displayPreferences(data?.[preferencesKey]);
+    if (fonts.includes(data?.[fontKey])) preferences.font = data[fontKey];
+    return preferences;
+  }
+  async function setDisplayPreferences(value) {
+    if (!value || !['light', 'dark'].includes(value.theme) || !fonts.includes(value.font) ||
+        !['simple', 'detailed'].includes(value.view) || typeof value.advancedMode !== 'boolean' ||
+        !['normal', 'large', 'extra-large'].includes(value.textSize) ||
+        !['standard', 'comfortable'].includes(value.spacing) || typeof value.reduceMotion !== 'boolean') {
+      throw new Error('Invalid display preferences.');
+    }
+    const preferences = displayPreferences(value);
+    await storage('set', { [preferencesKey]: preferences, [fontKey]: preferences.font });
+  }
+  function subscribeDisplayPreferences(listener) {
+    const event = api()?.extension.storage.onChanged;
+    if (!event) return () => {};
+    const handle = (changes, area) => {
+      if (area === 'local' && (preferencesKey in changes || fontKey in changes)) listener();
+    };
+    event.addListener(handle);
+    return () => event.removeListener(handle);
+  }
+  function applyDisplayPreferences(element, value) {
+    for (const [key, choice] of Object.entries(displayPreferences(value))) element.dataset[key] = String(choice);
+  }
   // Extension files (fonts) as URLs usable from content scripts.
   const fileUrl = (path) => api()?.extension.runtime?.getURL?.(path) ?? null;
 
@@ -210,6 +254,7 @@
   }
 
   globalThis.CheckoutGuard = Object.freeze({
+    displayPreferences, getDisplayPreferences, setDisplayPreferences, subscribeDisplayPreferences, applyDisplayPreferences,
     recordSpend, applySnapshot, approve, isApproved, clearApprovals, getFont, setFont, subscribeFont, fileUrl,
     queuePurchase, pendingPurchases, subscribePurchases, validPurchase,
     acknowledgePurchase: (id) => storage('remove', purchasePrefix + id),

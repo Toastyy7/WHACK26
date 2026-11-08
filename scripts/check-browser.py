@@ -110,7 +110,7 @@ try:
         settings = page.get_by_role('button', name='⚙ Settings')
         settings.click()
         view = page.get_by_role('switch', name='Detailed view')
-        page.locator('.setting span', has_text='Detailed view').click()  # clicking the words alone must toggle
+        page.locator('.setting-title', has_text='Detailed view').click()  # clicking the words alone must toggle
         expect(view).to_be_checked()
         expect(page.locator('#settings-panel')).to_be_visible()  # and the menu stays open
         expect(overview).to_contain_text('Card limit used28%')
@@ -132,6 +132,50 @@ try:
         page.get_by_role('switch', name='Dyslexia-friendly font (OpenDyslexic)').uncheck()
         page.keyboard.press('Escape')
         expect(page.locator('html')).to_have_attribute('data-font', 'default')
+        # Native centred dialog: advanced controls, persistence, keyboard and mobile.
+        settings.click()
+        panel = page.locator('#settings-panel')
+        box = panel.bounding_box()
+        assert box['width'] > 650 and abs(box['x'] + box['width'] / 2 - 720) < 2
+        page.get_by_role('switch', name='Advanced Mode').check()
+        page.get_by_label('Text size', exact=False).select_option('extra-large')
+        page.get_by_role('switch', name='Comfortable spacing').check()
+        page.get_by_role('switch', name='Reduce motion', exact=True).check()
+        page.get_by_role('switch', name='Dark mode').check()
+        expect(page.locator('html')).to_have_attribute('data-text-size', 'extra-large')
+        assert page.evaluate("getComputedStyle(document.documentElement).fontSize") == '20px'
+        assert page.locator('#setting-theme').evaluate("el => getComputedStyle(el).transitionDuration") == '0s'
+        page.get_by_role('button', name='Done', exact=True).focus()
+        page.keyboard.press('Tab')
+        assert panel.evaluate('el => el.contains(document.activeElement)')
+        page.keyboard.press('Escape')
+        expect(settings).to_be_focused()
+        page.reload()
+        expect(page.locator('html')).to_have_attribute('data-text-size', 'extra-large')
+        page.get_by_role('button', name='Reset demo', exact=True).click()
+        expect(page.locator('html')).to_have_attribute('data-spacing', 'comfortable')
+        expect(page.locator('html')).to_have_attribute('data-theme', 'dark')
+        page.set_viewport_size({'width': 375, 'height': 850})
+        settings.click()
+        page.get_by_role('switch', name='Dyslexia-friendly font (OpenDyslexic)').check()
+        assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
+        assert panel.evaluate('el => el.scrollWidth <= el.clientWidth')
+        page.get_by_role('switch', name='Advanced Mode').uncheck()
+        expect(page.locator('html')).to_have_attribute('data-text-size', 'normal')
+        page.get_by_role('switch', name='Advanced Mode').check()
+        expect(page.get_by_label('Text size', exact=False)).to_have_value('extra-large')
+        # Restore baseline preferences for the existing account flow tests.
+        page.get_by_role('switch', name='Advanced Mode').uncheck()
+        page.get_by_role('switch', name='Dark mode').uncheck()
+        page.get_by_role('switch', name='Dyslexia-friendly font (OpenDyslexic)').uncheck()
+        page.get_by_role('button', name='Done', exact=True).click()
+        page.set_viewport_size({'width': 1440, 'height': 1100})
+        page.emulate_media(reduced_motion='reduce')
+        settings.click()
+        assert page.locator('#setting-theme').evaluate("el => getComputedStyle(el).transitionDuration") == '0s'
+        page.keyboard.press('Escape')
+        page.emulate_media(reduced_motion='no-preference')
+        print('PASS advanced settings: centred dialog, focus trap/return, text size, spacing, reduced motion, dark mode, reload/reset persistence, retained choices and mobile with OpenDyslexic')
         for purchase, words, zone in [('10', '£10.00 safe to spend', 'amber'), ('20', '£0.00 safe to spend', 'amber'),
                                       ('50', '£30.00 over your safe limit', 'red'), ('800', '£780.00 over your safe limit', 'red')]:
             amount.fill(purchase)
@@ -179,6 +223,17 @@ try:
         for total in ['£1,234.56', '£0.00', '£69.99']:  # end on a real amount: Continue refuses £0
             boot(total)
             expect(checkout.locator('#cg-order-amount')).to_have_text(total)
+        display = dict(theme='dark', font='dyslexic', view='detailed', advancedMode=True, textSize='extra-large', spacing='comfortable', reduceMotion=True)
+        original_shop_background = checkout.evaluate('getComputedStyle(document.body).backgroundColor')
+        checkout.evaluate("display => window.__setSettings({'checkoutGuard.preferences': display, 'checkoutGuard.font': display.font})", display)
+        expect(checkout.locator('#checkout-guard-overlay')).to_have_attribute('data-theme', 'dark')
+        expect(checkout.locator('#checkout-guard-overlay')).to_have_attribute('data-text-size', 'extra-large')
+        expect(checkout.locator('#cg-extra-detail')).to_be_visible()
+        assert checkout.locator('.cg-title').evaluate('el => getComputedStyle(el).fontSize') == '30px'
+        assert checkout.locator('#checkout-guard-modal').evaluate('el => getComputedStyle(el).animationName') == 'none'
+        assert checkout.locator('.cg-gauge-fill').evaluate('el => getComputedStyle(el).transitionDuration') == '0s'
+        assert checkout.evaluate('getComputedStyle(document.body).backgroundColor') == original_shop_background
+        print('PASS overlay preferences: live updates, larger text, spacing, dark theme, reduced motion, detailed view, host page unaffected')
         expect(checkout.locator('#cg-proceed')).to_be_enabled(timeout=3000)
         checkout.locator('#cg-proceed').click()
         checkout.locator('#name').evaluate("el => el.insertAdjacentHTML('afterend', '<p>Address checked</p>')")
@@ -273,6 +328,11 @@ try:
         popup = extension.new_page()
         popup.goto(base + '/checkout-guard/popup.html')
         expect(popup.locator('#saveBtn')).to_be_enabled()
+        popup.evaluate("display => window.__setSettings({'checkoutGuard.preferences': display, 'checkoutGuard.font': display.font})", display)
+        expect(popup.locator('html')).to_have_attribute('data-text-size', 'extra-large')
+        assert popup.locator('h1').evaluate('el => getComputedStyle(el).fontSize') == '23.75px'
+        assert popup.locator('button').first.evaluate('el => getComputedStyle(el).minHeight') == '52px'
+        expect(popup.locator('#extraDetail')).to_be_visible()
         spent = popup.get_by_label('You owe (£)')
         budget = popup.get_by_label('Safe limit (£)')
         for spend, detail, remaining, zone in [('120', 'You owe £120.00 of your £300.00 safe limit.', '£180.00', 'safe'),
@@ -389,6 +449,22 @@ try:
         expect(shop.locator('#checkout-guard-overlay')).to_have_attribute('data-font', 'dyslexic', timeout=5000)
         assert 'OpenDyslexic' in shop.evaluate("getComputedStyle(document.querySelector('#cg-budget-status')).fontFamily")
         shop.wait_for_function("document.fonts.check('16px OpenDyslexic')", timeout=5000)  # really loaded from the extension
+        dash.get_by_role('switch', name='Advanced Mode').check()
+        dash.get_by_label('Text size', exact=False).select_option('extra-large')
+        dash.get_by_role('switch', name='Comfortable spacing').check()
+        dash.get_by_role('switch', name='Reduce motion', exact=True).check()
+        dash.get_by_role('switch', name='Dark mode').check()
+        for target in (toolbar.locator('html'), shop.locator('#checkout-guard-overlay')):
+            for key, value in [('theme', 'dark'), ('text-size', 'extra-large'), ('spacing', 'comfortable'), ('reduce-motion', 'true')]:
+                expect(target).to_have_attribute('data-' + key, value, timeout=5000)
+        assert shop.locator('.cg-title').evaluate('el => getComputedStyle(el).fontSize') == '30px'
+        assert toolbar.locator('h1').evaluate('el => getComputedStyle(el).fontSize') == '23.75px'
+        dash.keyboard.press('Escape')
+        dash.get_by_role('button', name='Reset demo', exact=True).click()
+        toolbar.reload()
+        expect(toolbar.locator('html')).to_have_attribute('data-text-size', 'extra-large')
+        expect(toolbar.locator('#remainingAmount')).to_have_text('£20.00')
+        print('PASS real preference bridge: all accessibility choices reach both popups live and survive reset/reopen')
         real.close()
         dash_server.shutdown()
         dash_server.server_close()

@@ -70,6 +70,18 @@ It's removed when Firefox closes, so load it again next time.
 4. Wait for the timer, click **Continue to checkout**. The dashboard and both extension popups now say **Safe to spend £0.00** and "You owe £349.99 of your £300.00 safe limit". The popup stays away on that shop for 30 minutes.
 5. Or click **Leave checkout** instead. The item appears in the dashboard's 30-minute reflection queue.
 
+### Personalise the website and extension together
+
+Open **⚙ Settings** on the website. The large centred dialog has the existing theme, font and Detailed view switches. Enable **Advanced Mode** for:
+
+- **Text size:** Standard, Larger or Largest.
+- **Comfortable spacing:** more room around lines and controls.
+- **Reduce motion:** no decorative animations or transitions. Device reduced-motion settings always apply.
+
+Changes save automatically, survive refresh and **Reset demo**, and apply to the toolbar popup and checkout overlay in this browser profile. Turn Advanced Mode off to pause its effects; turn it back on to restore your choices. Escape, Done and × close the dialog. Tab stays inside until you close it.
+
+Keep a dashboard tab open on an allowed port when changing settings. Then open the extension toolbar or the fake checkout in another tab to compare. Already-open extension popups update automatically; the shop page itself is unchanged. Reload the extension and refresh all tabs after updating the code. If storage is blocked, the website explains that choices may last only for this visit.
+
 ## 4. Run the checks
 
 ```sh
@@ -104,4 +116,4 @@ Package the extension as a ZIP (for sharing or Firefox signing): `npm run pack:e
 | `npm ci` errors about the lockfile | You're on an old branch. Pull, then run `npm ci` again. |
 | Blank page | You opened a `file://` URL. Use one of the servers above. |
 | Want a clean demo | Click **Reset demo** in the dashboard header. |
-| Dyslexia-friendly font, dark mode or detailed view | **⚙ Settings** in the dashboard header. The font also switches the extension's popups (refresh the shop tab if it was already open). |
+| Font, theme, detailed view, text size, spacing or motion | **⚙ Settings** in the dashboard header. Advanced Mode reveals extra choices. All effective choices also apply to both extension popups. Reload the extension and refresh tabs after a code update. |
