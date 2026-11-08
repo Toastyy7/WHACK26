@@ -110,7 +110,9 @@ try:
         settings = page.get_by_role('button', name='⚙ Settings')
         settings.click()
         view = page.get_by_role('switch', name='Detailed view')
-        view.check()
+        page.locator('.setting span', has_text='Detailed view').click()  # clicking the words alone must toggle
+        expect(view).to_be_checked()
+        expect(page.locator('#settings-panel')).to_be_visible()  # and the menu stays open
         expect(overview).to_contain_text('Card limit used28%')
         expect(overview).to_contain_text('Safe to spend£20.00')  # same headline in both views
         page.reload()

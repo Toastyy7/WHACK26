@@ -57,7 +57,8 @@ export default function SettingsMenu({ view, onView, font, onFont }) {
       <button className="secondary" aria-expanded={open} aria-controls="settings-panel" onClick={() => setOpen(!open)}>
         ⚙ Settings
       </button>
-      <div id="settings-panel" className="navigation-options settings-panel" role="group" aria-label="Settings" hidden={!open}>
+      {/* tabIndex -1: pressing on a label's text keeps focus inside, so the menu doesn't close mid-click. */}
+      <div id="settings-panel" className="navigation-options settings-panel" role="group" aria-label="Settings" hidden={!open} tabIndex={-1}>
         {switches.map(([label, on, set]) => (
           <label key={label} className="setting">
             <span>{label}</span>
