@@ -279,3 +279,20 @@ project-brief.md            pitch, demo script, judge Q&A
 ### OCR/review verification
 
 `python scripts/check-statement-ocr.py [optional-image-paths...]` uses the Playwright/Chromium setup from the browser suite. It generates a synthetic image and image-only PDF, verifies that cancelling never saves rows, corrects an amount before confirming, checks the current-month balance and Reset, and rejects external requests. Optional image paths are read locally and never copied into source control. Unit tests cover word-split headings/dates, In/Out order, date-year inference, categorisation and review validation. Poor scans still require manual correction; template totals are not treated as ground truth.
+
+### Focus mode
+Home has a prominent Focus mode button. A native modal blurs and disables the
+background and presents one fact at a time: owed, safe to spend, selected current-month
+recorded outgoing, and the largest recorded category. The final step offers optional
+links to statement review or the purchase preview, or finishing. Back, Next, Close and
+Escape are supported; summary steps never advance automatically and there are no sounds. Shared
+`getGaugeState` calculations and existing category summaries are reused in `src/focus.js`.
+The summary uses local data only, does not infer missing transactions or financial
+advice, and is not stored. Reset demo remounts the modal and closes it. Display settings
+and theme apply to the popup. No extension or server changes are required.
+
+Focus mode opens with “Take a breather.” and an optional breathing guide. Start
+plays an expanding/shrinking circle with four-second in/out prompts; Pause stops it.
+“Show my summary” skips the guide immediately. Closing, Escape, leaving the welcome
+step or Reset demo stops its timer. Both system and app reduced-motion settings keep
+the circle still while the words change. No breathing history is recorded.
