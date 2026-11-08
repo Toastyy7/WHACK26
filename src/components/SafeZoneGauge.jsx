@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import PurchaseProjection from './PurchaseProjection.jsx';
 
 // "Try a purchase first": a what-if that never changes the account.
-// The current safe-to-spend number and bar live in AccountOverview, not here.
+// A valid amount compares current and projected safe-limit usage without saving it.
 export default function SafeZoneGauge({ account, balanceFigure }) {
   const [purchase, setPurchase] = useState('');
   return (
