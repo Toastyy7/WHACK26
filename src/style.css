@@ -407,3 +407,17 @@ td select { min-width: 210px; margin: 0; }
 .cooling-meta { font-size: 0.85rem; color: var(--muted); margin: 4px 0 0; }
 .celebrate-btn { background: #16823c; border-color: #16823c; color: #fff; font-size: 0.88rem; }
 .empty-cooling { background: var(--soft); border: 1px dashed var(--line); border-radius: 10px; padding: 16px; text-align: center; }
+
+/* Settings menu: one row per switch. */
+.settings-panel { min-width: 260px; padding: 8px; }
+.setting { display: flex; align-items: center; gap: 10px; padding: 8px; font-weight: 600; cursor: pointer; }
+.setting input { width: 20px; height: 20px; flex-shrink: 0; accent-color: var(--brand-blue); }
+
+/* Dyslexia-friendly font: OpenDyslexic (already wide) with a little more room between lines. */
+:root[data-font='dyslexic'] {
+  font-family: 'OpenDyslexic', system-ui, sans-serif;
+  line-height: 1.7;
+}
+:root[data-font='dyslexic'] h1,
+:root[data-font='dyslexic'] h2,
+:root[data-font='dyslexic'] .overview strong { letter-spacing: 0; line-height: 1.3; }

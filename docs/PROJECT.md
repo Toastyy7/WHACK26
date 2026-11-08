@@ -63,14 +63,14 @@ React 19 and Vite 7, with no router and no state library. `App.jsx` holds the sh
 
 | Feature | What it does | Main files |
 |---|---|---|
-| Safe to spend (top card) | Headline **Safe to spend**, a status in words, the sum behind it (Safe limit − You owe = Safe to spend) and one bar. Same number and words as the extension. What you owe = starting balance + this month's purchases. **Detailed view** (header toggle, remembered) adds card limit, this month's purchases, % of card and safe limit used, and the colour key. The headline is identical in both views. | `AccountOverview.jsx`, `account.js`, `statements/monthlyBalance.js` |
+| Safe to spend (top card) | Headline **Safe to spend**, a status in words, the sum behind it (Safe limit − You owe = Safe to spend) and one bar. Same number and words as the extension. What you owe = starting balance + this month's purchases. **Detailed view** (⚙ Settings, remembered) adds card limit, this month's purchases, % of card and safe limit used, and the colour key. The headline is identical in both views. | `AccountOverview.jsx`, `account.js`, `statements/monthlyBalance.js` |
 | Try a purchase first | Type an amount to see "After this: £X safe to spend" or "£X over your safe limit". Never changes the account. | `SafeZoneGauge.jsx`, `PurchaseProjection.jsx` |
 | Reflection queue | Checkouts paused by the extension, kept for 30 minutes. "I don't need this" removes an item and adds it to **Total Impulse Money Saved**. | `ImpulseCoolingQueue.jsx`, `coolingQueue.js`, `hooks/useCoolingQueue.js` |
 | Request Grace | Draft → edit → review → disclaimer and consent → send → status updates. The decision is simulated at random and doesn't predict a real lender. | `RequestGrace.jsx`, `grace.js` |
 | Statement analysis | Upload a text-based GBP bank statement PDF (or load the demo statement). Rows are extracted locally, categorised and reconciled against the statement's own total. You can change categories, include/exclude rows and add transactions manually. | `StatementAnalysis.jsx`, `AddTransactionForm.jsx`, `statements/*` |
 | Home spending summary | This month's saved transactions on Home, with Remove/restore. | `HomeSpendingSummary.jsx` |
 | Demo controls | Presenter-only: starting balance, credit limit, target %. | `DemoControls.jsx` |
-| Theme, view, menu, reset | Light/dark theme and Simple/Detailed view (both kept across resets), navigation, **Reset demo** clears everything else. | `ThemeToggle.jsx`, `ViewToggle.jsx`, `NavigationMenu.jsx` |
+| ⚙ Settings, menu, reset | One Settings menu with switches for **Dark mode**, **Detailed view** and **Dyslexia-friendly font (OpenDyslexic)**, all remembered and kept across Reset demo. The font is bundled (works offline) and also switches the extension's popups. ☰ Menu for navigation; **Reset demo** clears everything else. | `SettingsMenu.jsx`, `NavigationMenu.jsx` |
 
 ### Statement import
 
@@ -95,6 +95,7 @@ One Manifest V3 folder for Chrome and Firefox 142+. No bundler, no background wo
 | `content.css` | Styles scoped to the injected popup, with reduced-motion support. |
 | `test-checkout.html` | Fake shop for testing. It never submits a payment. |
 | `icons/` | Toolbar and extensions-page icon (16/32/48/128 px). |
+| `fonts/` | OpenDyslexic 400/700 (`woff2`) with its OFL licence. Listed as web-accessible so the checkout popup can use it on shop pages. A shop with a strict font policy can block it; the popup then keeps the normal font. |
 
 ### Detection (`detect.js`)
 
@@ -138,6 +139,7 @@ All messages are `window.postMessage` within the dashboard tab. Both sides check
 | dash → ext | `purchase-saved` `{id}` | Saved for good, so the extension deletes its pending copy. |
 | ext → dash | `cooling-item` `{version, id, title, store, amount, savedAt, expiresAt}` | Added to the reflection queue, then acknowledged. |
 | dash → ext | `cooling-item-saved` `{id}` | As above. |
+| dash → ext | `preferences` `{font}` | Font choice (`default`/`dyslexic`). Both extension popups switch font. Sent on start-up and when it changes. |
 | dash → ext | `reset` | Reset demo was pressed. The extension forgets approved shops. |
 | dash → ext | `snapshot` `{monthlyBudget, currentSpent}` (pence) | The extension takes these as its budget and spend. Sent on start-up and whenever they change. |
 
@@ -163,6 +165,7 @@ All of the dashboard's bridge code is in `src/hooks/useExtensionBridge.js`. To s
 | `credit-guard-checkout-receipts-v1` | IDs of received purchases (prevents replays) | No, on purpose |
 | `credit-guard-theme` | Light/dark choice | No |
 | `credit-guard-view` | Simple/Detailed view choice | No |
+| `credit-guard-font` | Normal/OpenDyslexic font choice | No |
 
 The account itself (balance, limit, target, support request) lives in memory only and goes back to the demo values when the page reloads.
 
@@ -174,6 +177,7 @@ The account itself (balance, limit, target, support request) lives in memory onl
 | `checkoutGuard.purchase.<id>` | A purchase waiting for the dashboard |
 | `checkoutGuard.cooling.<id>` | A paused checkout waiting for the dashboard |
 | `checkoutGuard.approved.<hostname>` | Time until which that shop won't pause again (30 min) |
+| `checkoutGuard.font` | `default` or `dyslexic`, set by the dashboard's Settings |
 
 ## Testing and CI
 
@@ -189,7 +193,8 @@ GitHub Actions (`.github/workflows/check.yml`) runs all of these on every push a
 ## Privacy and security
 
 - No network requests, no analytics, no accounts, no real payments or support messages.
-- The extension stores only amounts, shop hostnames and page titles, never URLs, query strings or card details.
+- The extension stores only amounts, shop hostnames, page titles and the font choice, never URLs, query strings or card details.
+- Only the two font files are web-accessible (needed to show OpenDyslexic on shop pages).
 - Bridge messages are restricted to the same tab and origin, and the extension bridges only to localhost dashboard ports.
 - All data read from storage or messages is validated before use. Invalid stored settings fall back to defaults; a failed read never replaces your saved budget with a guess.
 

@@ -34,7 +34,9 @@
 
   window.addEventListener('message', async (event) => {
     if (event.source !== window || event.origin !== location.origin || event.data?.source !== 'credit-guard-dashboard') return;
-    if (event.data.type === 'reset') {
+    if (event.data.type === 'preferences') {
+      try { await guard.setFont(event.data.font); } catch (error) { console.warn('[CheckoutGuard] Font not applied:', error.message); }
+    } else if (event.data.type === 'reset') {
       try { await guard.clearApprovals(); } catch (error) { console.warn('[CheckoutGuard] Reset not applied:', error.message); }
     } else if (event.data.type === 'snapshot') {
       snapshot = { monthlyBudget: event.data.monthlyBudget, currentSpent: event.data.currentSpent };

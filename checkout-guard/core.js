@@ -178,6 +178,27 @@
   const approvalPrefix = 'checkoutGuard.approved.';
   const approvalMs = 30 * 60 * 1000;
   const approve = (host, now = Date.now()) => storage('set', { [approvalPrefix + host]: now + approvalMs });
+  // Font follows the dashboard's setting. A separate key, so saving budgets never resets it.
+  const fontKey = 'checkoutGuard.font';
+  const fonts = ['default', 'dyslexic'];
+  async function getFont() {
+    const font = (await storage('get', fontKey))?.[fontKey];
+    return fonts.includes(font) ? font : 'default';
+  }
+  async function setFont(font) {
+    if (!fonts.includes(font)) throw new Error('Unknown font.');
+    await storage('set', { [fontKey]: font });
+  }
+  function subscribeFont(listener) {
+    const event = api()?.extension.storage.onChanged;
+    if (!event) return () => {};
+    const handle = (changes, area) => { if (area === 'local' && fontKey in changes) listener(); };
+    event.addListener(handle);
+    return () => event.removeListener(handle);
+  }
+  // Extension files (fonts) as URLs usable from content scripts.
+  const fileUrl = (path) => api()?.extension.runtime?.getURL?.(path) ?? null;
+
   // Reset demo (dashboard) and Reset (popup) make every shop pause again.
   async function clearApprovals() {
     const keys = Object.keys(await storage('get', null)).filter((key) => key.startsWith(approvalPrefix));
@@ -189,7 +210,7 @@
   }
 
   globalThis.CheckoutGuard = Object.freeze({
-    recordSpend, applySnapshot, approve, isApproved, clearApprovals,
+    recordSpend, applySnapshot, approve, isApproved, clearApprovals, getFont, setFont, subscribeFont, fileUrl,
     queuePurchase, pendingPurchases, subscribePurchases, validPurchase,
     acknowledgePurchase: (id) => storage('remove', purchasePrefix + id),
     queueCoolingItem, pendingCoolingItems, subscribeCoolingItems, validCoolingItem,
