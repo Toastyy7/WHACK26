@@ -16,7 +16,7 @@ Then load `checkout-guard/` as an unpacked extension.
 | [docs/LAUNCH.md](docs/LAUNCH.md) | run the app and extension, run the tests, fix common problems |
 | [docs/PROJECT.md](docs/PROJECT.md) | understand features, money rules, sync protocol, stored data and every file |
 | [docs/REPO-FIX.md](docs/REPO-FIX.md) | clean up the repo and the team's git workflow |
-| [docs/RUST-BACKEND-PLAN.md](docs/RUST-BACKEND-PLAN.md) | proposal: should we add a (Rust) backend? Verdict, options and plan |
+| [docs/BACKEND-PLAN.md](docs/BACKEND-PLAN.md) | plan: accounts backend (register / log in / log out), Node vs Rust |
 | [project-brief.md](project-brief.md) | pitch, 90-second demo script, judge Q&A |
 
 **Rule:** never commit to `main`. Use a branch and a pull request (see REPO-FIX.md).
