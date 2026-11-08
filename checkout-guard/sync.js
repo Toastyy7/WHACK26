@@ -27,7 +27,9 @@
 
   window.addEventListener('message', async (event) => {
     if (event.source !== window || event.origin !== location.origin || event.data?.source !== 'credit-guard-dashboard') return;
-    if (event.data.type === 'snapshot') {
+    if (event.data.type === 'reset') {
+      try { await guard.clearApprovals(); } catch (error) { console.warn('[CheckoutGuard] Reset not applied:', error.message); }
+    } else if (event.data.type === 'snapshot') {
       try {
         await guard.applySnapshot({ monthlyBudget: event.data.monthlyBudget, currentSpent: event.data.currentSpent });
       } catch (error) { console.warn('[CheckoutGuard] Dashboard numbers not applied:', error.message); }

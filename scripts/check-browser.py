@@ -330,11 +330,17 @@ try:
         expect(dash_overview).to_contain_text('Left to spend this month£230.01')
         other.locator('#cg-step-away').click()
         expect(dash.get_by_text('Paused from')).to_have_count(2, timeout=10000)  # demo item + this checkout
+        # Reset demo must make the approved shop pause again (live demos repeat the flow).
+        dash.get_by_role('button', name='Reset demo', exact=True).click()
+        dash.wait_for_timeout(500)
+        shop.reload()
+        expect(shop.get_by_role('dialog')).to_be_visible(timeout=10000)
+        expect(shop.locator('#cg-left-now')).to_have_text('£300.00')  # reset numbers reach the extension too
         real.close()
         dash_server.shutdown()
         dash_server.server_close()
         assert not errors, errors
-        print('PASS real extension: shared budget, Continue updates both sides, approved shop stays quiet, Leave checkout reaches the reflection queue')
+        print('PASS real extension: shared budget, Continue updates both sides, approved shop stays quiet, Reset demo re-arms it, Leave checkout reaches the reflection queue')
         print('PASS no browser JavaScript errors')
 finally:
     server.shutdown()

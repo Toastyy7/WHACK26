@@ -145,3 +145,14 @@ test('a shop stays approved for 30 minutes so multi-page checkouts do not pause 
   assert.equal(await guard.isApproved('other.example', now), false);
   assert.equal(await guard.isApproved('shop.example', now + 31 * 60 * 1000), false);
 });
+
+test('clearing approvals makes every shop pause again (used by Reset demo)', async () => {
+  const { guard, values } = memoryGuard({ monthlyBudget: 300 });
+  const now = 1_000_000;
+  await guard.approve('shop.example', now);
+  await guard.approve('other.example', now);
+  await guard.clearApprovals();
+  assert.equal(await guard.isApproved('shop.example', now), false);
+  assert.equal(await guard.isApproved('other.example', now), false);
+  assert.equal(values.monthlyBudget, 300);  // settings untouched
+});

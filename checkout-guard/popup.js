@@ -120,7 +120,11 @@ document.addEventListener('DOMContentLoaded', () => {
       notice('Could not update the guard. Please try again.', true);
     } finally { enabledLabel(); setBusy(false); }
   });
-  find('resetBtn').addEventListener('click', () => save({ ...guard.defaults }));
+  find('resetBtn').addEventListener('click', () => {
+    save({ ...guard.defaults });
+    // Also make every shop pause again.
+    if (guard.available()) guard.clearApprovals().catch(() => notice('Could not reset approved shops.', true));
+  });
   find('retryLoad').addEventListener('click', load);
   guard.subscribe(async () => {
     if (busy) return;

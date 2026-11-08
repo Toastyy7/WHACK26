@@ -180,13 +180,18 @@
   const approvalPrefix = 'checkoutGuard.approved.';
   const approvalMs = 30 * 60 * 1000;
   const approve = (host, now = Date.now()) => storage('set', { [approvalPrefix + host]: now + approvalMs });
+  // Reset demo (dashboard) and Reset (popup) make every shop pause again.
+  async function clearApprovals() {
+    const keys = Object.keys(await storage('get', null)).filter((key) => key.startsWith(approvalPrefix));
+    for (const key of keys) await storage('remove', key);
+  }
   async function isApproved(host, now = Date.now()) {
     const until = (await storage('get', approvalPrefix + host))?.[approvalPrefix + host];
     return Number.isSafeInteger(until) && until > now;
   }
 
   globalThis.CheckoutGuard = Object.freeze({
-    recordSpend, applySnapshot, approve, isApproved,
+    recordSpend, applySnapshot, approve, isApproved, clearApprovals,
     queuePurchase, pendingPurchases, subscribePurchases, validPurchase,
     acknowledgePurchase: (id) => storage('remove', purchasePrefix + id),
     queueCoolingItem, pendingCoolingItems, subscribeCoolingItems, validCoolingItem,

@@ -2,6 +2,9 @@ import { useEffect, useRef } from 'react';
 
 const post = (message) => window.postMessage({ source: 'credit-guard-dashboard', ...message }, location.origin);
 
+// Reset demo: the extension forgets approved shops so the pause shows again.
+export const resetExtension = () => post({ type: 'reset' });
+
 // The dashboard's only link to the CheckoutGuard extension (checkout-guard/sync.js).
 // Messages never leave this window: both sides check the source window and origin.
 // Extension → dashboard: purchases and paused checkouts, acknowledged only once saved.

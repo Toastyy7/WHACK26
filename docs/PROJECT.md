@@ -120,7 +120,8 @@ These were added to stop CPU spikes and layout thrashing across many open tabs. 
 2. **Continue to checkout** (enabled after the pause): adds the amount to "Already spent", queues the purchase for the dashboard, and **approves this shop for 30 minutes**, so the address → payment → review pages don't pause again or log the order twice.
 3. **Close (×) / Escape:** dismisses the popup and approves the shop the same way, but records no purchase.
 4. **Leave checkout:** saves the order to the reflection queue (30 minutes) and goes back a page. It doesn't approve the shop, so returning brings the pause back.
-5. Turning the guard off closes any open popup. Settings changes update an open popup immediately.
+5. **Reset demo** on the dashboard, or **Reset** in the toolbar popup, forgets all approved shops so the pause shows again.
+6. Turning the guard off closes any open popup. Settings changes update an open popup immediately.
 
 The popup traps Tab focus, supports Escape, restores focus afterwards and announces status to screen readers. All page text is inserted with `textContent`; nothing from the page or from storage is placed into HTML.
 
@@ -136,6 +137,7 @@ All messages are `window.postMessage` within the dashboard tab. Both sides check
 | dash → ext | `purchase-saved` `{id}` | Saved for good, so the extension deletes its pending copy. |
 | ext → dash | `cooling-item` `{version, id, title, store, amount, savedAt, expiresAt}` | Added to the reflection queue, then acknowledged. |
 | dash → ext | `cooling-item-saved` `{id}` | As above. |
+| dash → ext | `reset` | Reset demo was pressed. The extension forgets approved shops. |
 | dash → ext | `snapshot` `{monthlyBudget, currentSpent}` (pence) | The extension takes these as its budget and spend. Sent on start-up and whenever they change. |
 
 Reliability:

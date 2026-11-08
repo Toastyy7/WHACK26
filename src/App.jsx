@@ -14,7 +14,7 @@ import { setTransactionIncluded } from './statements/selection.js';
 import { monthlyBalance } from './statements/monthlyBalance.js';
 import useCurrentMonth from './hooks/useCurrentMonth.js';
 import useCoolingQueue from './hooks/useCoolingQueue.js';
-import useExtensionBridge from './hooks/useExtensionBridge.js';
+import useExtensionBridge, { resetExtension } from './hooks/useExtensionBridge.js';
 
 // App owns the data shared by the panels below. Props pass that data to each panel.
 export default function App() {
@@ -73,6 +73,7 @@ export default function App() {
     timer.current = null;
     setAccount(createInitialAccount());
     resetCoolingQueue();
+    resetExtension();
     clearStatement();
     setPage('home');
     // Remount the panels to clear local inputs and close the demo controls.
