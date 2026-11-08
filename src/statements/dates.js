@@ -22,10 +22,15 @@ export function findStatementPeriod(pages) {
     const end = calendarDate(endYear, endMonth, Number(match[4]));
     if (start && end && start <= end) return { start, end };
   }
+  // Some banks provide only a statement date. Make the inferred year explicit.
+  const text = pages.flat().map((item) => item.text).join(' ');
+  const statementDate = text.match(/statement\s+date\s+\d{1,2}\s+[a-z]{3,9}\s+(\d{4})/i);
+  if (statementDate) return { start: `${statementDate[1]}-01-01`, end: `${statementDate[1]}-12-31`, inferred: true };
   return null;
 }
 
 export function normalizeTransactionDate(raw, period = null) {
+  raw = raw.trim().replace(/(\d)-?([A-Za-z])/g, '$1 $2').replace(/([A-Za-z])(\d{2,4})\b/g, '$1 $2');
   let day, month, year;
   const named = raw.match(/^(\d{1,2})\s+([a-z]{3,9})(?:\s+(\d{2}|\d{4}))?$/i);
   const numeric = raw.match(/^(\d{1,2})[/.\-](\d{1,2})(?:[/.\-](\d{2}|\d{4}))?$/);

@@ -39,7 +39,7 @@ export default function App({ session = {} }) {
   const displayedAccount = { ...account, balance: adjustment.balance };
   // One money model: the extension gets the safe limit and what is owed, so both
   // sides show the same "safe to spend" (safe limit − owed).
-  useExtensionBridge({
+  const extensionConnection = useExtensionBridge({
     monthlyBudget: getGaugeState(displayedAccount.balance, account.limit, account.target).threshold,
     currentSpent: displayedAccount.balance,
     receivePurchase,
@@ -110,6 +110,11 @@ export default function App({ session = {} }) {
         </h1>
         <p>{{ home: 'See what you owe and what you can do next.', grace: 'Send a written request and follow its progress.', statements: 'See where your money goes.' }[page]}</p>
       </div>
+      <p className="extension-connection" role="status">
+        {extensionConnection === 'connected' ? 'Extension connected · balance is synced'
+          : extensionConnection === 'connecting' ? 'Checking extension connection…'
+            : 'Extension not connected. Reload CheckoutGuard, allow it on this site, then refresh this tab. Use the same Chrome or Firefox profile for shopping.'}
+      </p>
       {storageError && <p className="notice" role="alert">{storageError}</p>}
       {coolingError && <p className="notice" role="alert">{coolingError}</p>}
       <div key={resetKey}>

@@ -5,6 +5,7 @@ import { includedTransactions } from '../statements/selection.js';
 import AddTransactionForm from './AddTransactionForm.jsx';
 import { appendManualTransaction, importedTransactions } from '../statements/manualTransactions.js';
 import { getDemoStatement } from '../statements/demoStatement.js';
+import StatementReview from './StatementReview.jsx';
 
 export default function StatementAnalysis({ savedStatement, onSave, onClear, onViewHome, onSelect }) {
   // App owns saved results so Home and this screen always use the same transactions.
@@ -13,13 +14,18 @@ export default function StatementAnalysis({ savedStatement, onSave, onClear, onV
   const fileName = pendingFileName || savedStatement?.fileName || '';
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [draft, setDraft] = useState(null);
+  const [progress, setProgress] = useState('');
+  const reader = useRef(null);
   const input = useRef(null);
   // Ignore a late result if the user clears the upload or resets the demo.
   const uploadId = useRef(0);
-  useEffect(() => () => { uploadId.current += 1; }, []);
+  useEffect(() => () => { uploadId.current += 1; reader.current?.abort(); }, []);
 
   function clear() {
     uploadId.current += 1;
+    reader.current?.abort();
+    setDraft(null);
     onClear();
     setPendingFileName('');
     setBusy(false);
@@ -32,31 +38,45 @@ export default function StatementAnalysis({ savedStatement, onSave, onClear, onV
     setError('');
     setBusy(false);
     setPendingFileName('');
+    setDraft({ fileName: 'Sample statement (October 2026)', result: getDemoStatement() });
+  }
+
+  function confirmImport(reviewed) {
+    // Merge only at confirmation, using the latest saved data so checkout events are preserved.
     const manual = savedStatement?.result.transactions.filter((row) => row.source === 'manual' || row.source === 'checkout') ?? [];
-    const demo = getDemoStatement();
-    onSave({
-      fileName: 'Capital-One-Statement-Oct2026.pdf',
-      result: { ...demo, transactions: [...demo.transactions, ...manual] },
-      savedAt: Date.now(),
-    });
+    onSave({ fileName: draft.fileName, result: { ...reviewed, transactions: [...reviewed.transactions, ...manual] }, savedAt: Date.now() });
+    setDraft(null);
+    if (input.current) input.current.value = '';
+  }
+
+  function cancelReading() {
+    uploadId.current += 1;
+    reader.current?.abort();
+    setBusy(false);
+    setPendingFileName('');
+    setProgress('');
+    if (input.current) input.current.value = '';
   }
 
   async function upload(event) {
     const file = event.target.files[0];
     if (!file) return;
     const id = ++uploadId.current;
+    reader.current?.abort();
+    const controller = new AbortController();
+    reader.current = controller;
+    setDraft(null);
     setPendingFileName(file.name);
     setError('');
     setBusy(true);
     try {
-      if (!/\.pdf$/i.test(file.name)) throw new Error('Please choose a PDF statement.');
+      if (!/\.(pdf|png|jpe?g)$/i.test(file.name)) throw new Error('Choose a PDF, JPG or PNG statement.');
       // Load the PDF reader only when needed, keeping the home screen lightweight.
       const { readStatement } = await import('../statements/readPdf.js');
-      const extracted = await readStatement(file);
+      const extracted = await readStatement(file, { signal: controller.signal,
+        onProgress: (message) => { if (id === uploadId.current) setProgress(message); } });
       if (id === uploadId.current) {
-        // Replacing a PDF keeps manually entered payments.
-        const manual = savedStatement?.result.transactions.filter((row) => row.source === 'manual' || row.source === 'checkout') ?? [];
-        onSave({ fileName: file.name, result: { ...extracted, transactions: [...extracted.transactions, ...manual] }, savedAt: Date.now() });
+        setDraft({ fileName: file.name, result: extracted, file });
         setPendingFileName('');
       }
     } catch (failure) {
@@ -93,30 +113,33 @@ export default function StatementAnalysis({ savedStatement, onSave, onClear, onV
     <section className="card statement-analysis" aria-busy={busy}>
       <h2>Understand your outgoing spending</h2>
       <p>Upload a bank statement to group outgoing payments into general spending categories.</p>
-      <p className="muted">Your PDF is processed on this device. It is not uploaded to a server. Extracted transactions and category edits are saved in this browser and shown on Home. The PDF itself is not saved. Clear the statement or reset the demo to delete saved results.</p>
+      <p className="muted">Your file is processed on this device. It is not uploaded to a server. You review extracted transactions before confirming an import. Confirmed transactions and category edits are saved in this browser and shown on Home. The original file is not saved. Clear the statement or reset the demo to delete saved results.</p>
       <div className="demo-statement-box">
         <strong>Stage presentation demo</strong>
         <p className="muted">Test instant categorisation with a pre-configured Capital One statement without uploading a file.</p>
-        <button type="button" className="secondary" onClick={loadDemo} disabled={busy}>
+        <button type="button" className="secondary" onClick={loadDemo} disabled={busy || Boolean(draft)}>
           ⚡ Load sample statement (October 2026)
         </button>
       </div>
       <label>
-        GBP bank statement (PDF, up to 20 MB)
-        <input ref={input} type="file" accept="application/pdf,.pdf" onChange={upload} disabled={busy} />
+        GBP bank statement (PDF, JPG or PNG, up to 20 MB)
+        <input ref={input} type="file" accept="application/pdf,image/jpeg,image/png,.pdf,.jpg,.jpeg,.png" onChange={upload} disabled={busy} />
       </label>
-      <p className="muted">Supports GBP text-based statements with separate outgoing and incoming columns. Scanned image PDFs need OCR and cannot be read yet.</p>
+      <p className="muted">Supports GBP text-based statements with separate outgoing and incoming columns. Images and scanned PDFs are read locally with OCR, then shown for review.</p>
       {fileName && (
         <div className="actions">
           <p className="file-name">{fileName}</p>
           <button className="secondary" onClick={clear}>Clear statement</button>
         </div>
       )}
-      <div role="status">{busy && <p>Reading the statement and categorising outgoing payments…</p>}</div>
+      <div role="status">{busy && <p>{progress || 'Preparing statement reader…'}</p>}</div>
+      {busy && <button type="button" className="secondary" onClick={cancelReading}>Cancel reading</button>}
       {error && <p role="alert" className="notice">{error}</p>}
-      <AddTransactionForm disabled={busy}
+      {draft && <StatementReview key={uploadId.current} draft={draft} onConfirm={confirmImport}
+        onCancel={() => { setDraft(null); if (input.current) input.current.value = ''; }} />}
+      <AddTransactionForm disabled={busy || Boolean(draft)}
         onAdd={(transaction) => onSave(appendManualTransaction(savedStatement, transaction))} />
-      {result && !busy && (
+      {result && !busy && !draft && (
         <>
           <p role="status">Results are available on Home. If browser storage is available, they will also remain after refresh.</p>
           <button className="secondary" onClick={onViewHome}>View summary on Home</button>

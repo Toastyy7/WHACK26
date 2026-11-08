@@ -343,7 +343,19 @@ try:
         )
         real.on('page', lambda page: page.on('pageerror', lambda error: errors.append(str(error))))
         dash = real.new_page()
-        dash.goto(f'http://127.0.0.1:{dash_server.server_port}/')
+        # Simulate a missed first handshake. Sync must recover without a reload
+        # or an edit to the dashboard's demo controls.
+        dash.add_init_script('''
+          const started = Date.now();
+          window.addEventListener('message', event => {
+            if (Date.now() - started < 1000 &&
+                ['credit-guard-dashboard', 'checkout-guard-extension'].includes(event.data?.source)) {
+              event.stopImmediatePropagation();
+            }
+          }, true);
+        ''')
+        dash.goto(f'http://localhost:{dash_server.server_port}/')
+        expect(dash.get_by_role('status').filter(has_text='Extension connected')).to_be_visible(timeout=10000)
         dash_overview = dash.get_by_role('region', name='Account overview')
         expect(dash_overview).to_contain_text('£280')
         shop = real.new_page()
@@ -437,9 +449,20 @@ try:
             expect(site.get_by_role('heading', level=1)).to_have_text('Alice’s credit card')
             site.get_by_role('button', name=re.compile("I don't need this")).first.click()
             expect(saved).to_be_visible()
+            # alice imports a statement; it must stay hers.
+            statement = site.get_by_role('heading', name='Your statement spending')
+            site.get_by_role('button', name='☰ Menu').click()
+            site.get_by_role('navigation', name='Main navigation').get_by_role('button', name='Statement analysis').click()
+            site.get_by_role('button', name=re.compile('Load sample statement')).click()
+            site.locator('.statement-review').get_by_role('checkbox').last.check()
+            site.get_by_role('button', name='Confirm and import selected').click()
+            site.get_by_role('button', name='☰ Menu').click()
+            site.get_by_role('navigation', name='Main navigation').get_by_role('button', name='Home').click()
+            expect(statement).to_be_visible()
             log_out()
             create('bob', 'bob password')
             expect(saved).to_have_count(0)  # bob doesn't see alice's data
+            expect(statement).to_have_count(0)  # ...or her statement
             log_out()
             site.get_by_label('Username').fill('alice')
             site.get_by_label('Password', exact=True).fill('wrong password')
@@ -448,6 +471,7 @@ try:
             site.get_by_label('Password', exact=True).fill('alice password')
             site.get_by_role('button', name='Log in', exact=True).click()
             expect(saved).to_be_visible()  # alice's data is back
+            expect(statement).to_be_visible()
             site.reload()
             expect(site.get_by_text('Signed in as alice')).to_be_visible()  # session survives a reload
             log_out()
@@ -455,7 +479,7 @@ try:
             expect(site.get_by_text('Guest', exact=True)).to_be_visible()
             expect(site.get_by_role('heading', level=1)).to_have_text('Your credit card')
             web.close()
-            print('PASS accounts: register, separate data per account, wrong password, log in again, session survives reload, log out, guest')
+            print('PASS accounts: register, separate data and statements per account, wrong password, log in again, session survives reload, log out, guest')
         finally:
             accounts.terminate()
             accounts.wait(timeout=10)

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 const post = (message) => window.postMessage({ source: 'credit-guard-dashboard', ...message }, location.origin);
 
@@ -14,17 +14,29 @@ export default function useExtensionBridge({ monthlyBudget, currentSpent, receiv
   const snapshot = { type: 'snapshot', monthlyBudget, currentSpent: Math.max(0, currentSpent) };
   const latest = useRef();
   const preferences = { type: 'preferences', font };
+  const [connection, setConnection] = useState('connecting');
+  const lastConfirmed = useRef(Date.now());
   latest.current = { receivePurchase, receiveCoolingItem, snapshot, preferences };
 
   useEffect(() => {
+    function announce() {
+      post({ type: 'ready' });
+      post(latest.current.snapshot);
+      post(latest.current.preferences);
+    }
     function onMessage(event) {
       if (event.source !== window || event.origin !== location.origin || event.data?.source !== 'checkout-guard-extension') return;
       const { type, purchase, item } = event.data;
       // The extension may load after React; it announces itself and we reply.
       if (type === 'bridge-ready') {
-        post({ type: 'ready' });
-        post(latest.current.snapshot);
-        post(latest.current.preferences);
+        announce();
+      } else if (type === 'snapshot-applied') {
+        // Acknowledgement confirms that both sides have the same current money values.
+        if (event.data.monthlyBudget === latest.current.snapshot.monthlyBudget &&
+            event.data.currentSpent === latest.current.snapshot.currentSpent) {
+          lastConfirmed.current = Date.now();
+          setConnection('connected');
+        }
       } else if (type === 'purchase' && latest.current.receivePurchase(purchase)) {
         post({ type: 'purchase-saved', id: purchase.id });
       } else if (type === 'cooling-item' && latest.current.receiveCoolingItem(item)) {
@@ -32,11 +44,26 @@ export default function useExtensionBridge({ monthlyBudget, currentSpent, receiv
       }
     }
     window.addEventListener('message', onMessage);
-    post({ type: 'ready' });
-    return () => window.removeEventListener('message', onMessage);
+    announce();
+    // Retry the handshake, including on returning to the dashboard. A missed startup
+    // message must not leave purchases queued forever with no visible explanation.
+    window.addEventListener('focus', announce);
+    const retry = setInterval(() => {
+      if (Date.now() - lastConfirmed.current >= 15000) setConnection('disconnected');
+      announce();
+    }, 5000);
+    return () => {
+      clearInterval(retry);
+      window.removeEventListener('message', onMessage);
+      window.removeEventListener('focus', announce);
+    };
   }, []);
 
   // Resend whenever the shared numbers change.
-  useEffect(() => post(snapshot), [snapshot.monthlyBudget, snapshot.currentSpent]);
+  useEffect(() => {
+    setConnection('connecting');
+    post(snapshot);
+  }, [snapshot.monthlyBudget, snapshot.currentSpent]);
   useEffect(() => post(preferences), [font]);
+  return connection;
 }

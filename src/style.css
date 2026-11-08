@@ -471,3 +471,12 @@ td select { min-width: 210px; margin: 0; }
 .auth-hint { margin: -4px 0 4px; font-size: 0.85rem; color: var(--muted); }
 .auth-switch { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 4px 0 0; }
 .account-chip { align-self: center; font-size: 0.9rem; color: var(--muted); }
+
+.extension-connection { color: var(--muted); font-size: 0.9rem; margin: 12px 0; }
+
+.statement-review { margin: 20px 0; border: 2px solid var(--blue); }
+.statement-review td input:not([type='checkbox']) { min-width: 140px; }
+.statement-review td:nth-child(3) input { min-width: 240px; }
+.statement-review > p { margin-top: 16px; }
+.statement-review > button { margin: 16px 0; }
+.statement-image { display: block; max-width: 100%; height: auto; margin: 16px 0; }

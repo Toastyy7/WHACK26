@@ -82,7 +82,7 @@ It's removed when Firefox closes, so load it again next time.
 
 ### Check the extension and dashboard are synced
 
-1. Open the dashboard (5173, 4173 or 3000) in the **same browser profile** as the extension.
+1. Open the dashboard (5173, 4173 or 3000) in the **same browser profile** as the extension. Within a few seconds, check for **Extension connected · balance is synced** below the page introduction.
 2. In another tab open <http://127.0.0.1:5173/checkout-guard/test-checkout.html> (dev server) — a fake shop that never charges anything.
 3. The **Take a breath before you buy** popup appears with the dashboard's number: **Safe to spend now: £20.00** (fresh demo: you owe £280.00 of a £300.00 safe limit).
 4. Wait for the timer, click **Continue to checkout**. The dashboard and both extension popups now say **Safe to spend £0.00** and "You owe £349.99 of your £300.00 safe limit". The popup stays away on that shop for 30 minutes.
@@ -126,3 +126,28 @@ Package the extension as a ZIP (for sharing or Firefox signing): `npm run pack:e
 | "Too many attempts" | 5 wrong passwords for that username: wait 15 minutes or restart the server. |
 | Forgot a demo password | Stop the server, delete `server/data/users.json` (removes **all** accounts), start it again. |
 | Dyslexia-friendly font, dark mode or detailed view | **⚙ Settings** in the dashboard header. The font also switches the extension's popups (refresh the shop tab if it was already open). |
+
+### If a checkout still does not appear
+
+Check the connection line on the dashboard first. **Extension not connected** means the dashboard has not received confirmation of its current numbers. In Chrome, open the CheckoutGuard extension’s details and ensure site access allows both the local dashboard and the shop (for the demo, **On all sites**). Check that the unpacked extension path points to this checkout’s `checkout-guard` folder. Reload it, then refresh every dashboard and shop tab. In Firefox, reload the temporary add-on and refresh both tabs.
+
+The handshake retries every five seconds and when you return to the dashboard. A connected status confirms the money snapshot reached the extension, rather than merely that a script was detected. If the line says connected but a purchase is missing, use the fake checkout and inspect the dashboard’s visible storage error and the shop’s “Could not save the checkout” message. Continue remains a planned checkout entry, not confirmation that a real order was paid.
+
+## Bank statement images and scanned PDFs
+
+After updating packages run `npm ci`, then restart `npm run dev`. The npm startup/build hooks prepare the OCR worker, WASM engines and English data locally. For an offline demo use the freshly rebuilt `dist/` folder, which includes `dist/ocr/`; no CDN is needed.
+
+Open **Menu → Statement analysis** and choose a GBP **PDF, JPG or PNG** (20 MB maximum). Wait for the local progress message, or use **Cancel reading**. Images/scanned PDFs may take longer than text PDFs. Limits are 100 PDF pages and at most 15 scanned pages needing OCR.
+
+Uploads and the sample-statement button now open **Review before importing**. Nothing from that file changes Home or the balance until **Confirm and import selected**. Check dates, outgoing amounts and descriptions, correct categories, untick uncertain rows or use **Add a missing row**. Zero-value or low-confidence rows start unselected. Confirm the review checkbox only after checking the original. Cancel keeps your previous saved statement. Reset also cancels any active OCR job and clears its draft.
+
+A partial page, unreadable heading, blank template, old date or inconsistent example can produce missing/uncertain rows. Do not use opening/closing balances as transaction amounts or assume a mismatched total is an OCR bug. Improve image quality or correct the draft against all original pages. All-zero templates can be reviewed but are not imported as spending unless you enter real positive amounts.
+
+For automated checks, with the existing browser-test Python environment and Chromium installed:
+
+```sh
+npm run build
+python scripts/check-statement-ocr.py
+```
+
+Optional image file paths can be appended to check that your local examples reach review; they are not stored in the repository. The test also covers a generated scanned PDF and verifies that OCR makes no external requests.

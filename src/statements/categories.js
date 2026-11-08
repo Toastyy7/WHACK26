@@ -2,8 +2,8 @@
 // Ambiguous merchants stay in Other; users can correct any category in the review table.
 const rules = [
   ['Takeaways & dining', /deliveroo|uber\s*eats|just\s*eat|take\s*out|takeaway|restaurant|cafe|coffee|mcdonald|burger|kfc|pizza|nando|greggs|starbucks|costa\b/i],
-  ['Groceries', /tesco|sainsbury|aldi|lidl|asda|morrisons|waitrose|ocado|supermarket|grocery|groceries|co.op\b/i],
   ['Transport & travel', /tfl\b|travel|train|rail|bus\b|uber\b|bolt\b|taxi|parking|petrol|shell\b|bp\s+fuel|easyjet|ryanair|airways/i],
+  ['Groceries', /tesco|sainsbury|aldi|lidl|asda|morrisons|waitrose|ocado|supermarket|grocery|groceries|co.op\b/i],
   ['Bills & housing', /rent\b|mortgage|council|electric|energy|water\b|gas\b|broadband|vodafone|o2\b|ee\s|three\b|insurance/i],
   ['Entertainment & subscriptions', /netflix|spotify|prime\b|disney|cinema|steam\b|riotgames|playstation|xbox|apple\.com\/bill/i],
   ['Health & wellbeing', /pharmacy|chemist|boots\b|dentist|medical|gym\b|fitness|specsavers/i],
