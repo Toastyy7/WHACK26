@@ -105,6 +105,16 @@ try:
         expect(overview).to_contain_text('£280')
         expect(meter).to_have_attribute('aria-valuenow', '93')  # £280 owed of a £300 safe limit
         expect(overview).to_contain_text('Safe to spend£20.00')
+        expect(overview).to_contain_text('Safe limit£300.00− You owe£280.00= Safe to spend£20.00')  # the sum behind the number
+        expect(overview).not_to_contain_text('%')  # simple view: no percentages
+        view = page.get_by_role('button', name='Detailed view')
+        view.click()
+        expect(overview).to_contain_text('Card limit used28%')
+        expect(overview).to_contain_text('Safe to spend£20.00')  # same headline in both views
+        page.reload()
+        expect(view).to_have_attribute('aria-pressed', 'true')  # remembered
+        view.click()
+        expect(overview).not_to_contain_text('%')
         for purchase, words, zone in [('10', '£10.00 safe to spend', 'amber'), ('20', '£0.00 safe to spend', 'amber'),
                                       ('50', '£30.00 over your safe limit', 'red'), ('800', '£780.00 over your safe limit', 'red')]:
             amount.fill(purchase)
@@ -134,7 +144,7 @@ try:
         page.set_viewport_size({'width': 375, 'height': 900})
         amount.fill('50')
         assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
-        print('PASS dashboard: preview bands, invalid input, reflection savings, Request Grace send, reset, mobile, nested offline path')
+        print('PASS dashboard: safe-to-spend sum, simple/detailed view, preview bands, invalid input, reflection savings, Request Grace send, reset, mobile, nested offline path')
 
         extension = browser.new_context()
         extension.add_init_script(MOCK_STORAGE)

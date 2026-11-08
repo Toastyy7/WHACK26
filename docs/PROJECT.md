@@ -52,7 +52,7 @@ flowchart LR
 - **Balance = amount owed.** Purchases from this month (statement rows, manual entries, checkouts from the extension) are **added** to the starting balance, like spending on a real card. The what-if preview uses the same direction, so a £50 preview and a real £50 purchase show the same number. Removing a transaction undoes it.
 - **Only the current calendar month counts** (browser local time). Older months, unknown dates and removed rows are ignored. The total is recalculated each time from the transaction list, never kept as a running total, so a refresh can't double-count.
 - **One money model, one headline number: "Safe to spend".** The *safe limit* is the chosen target share of the card limit (30% of £1,000 = £300). *Safe to spend* = safe limit − what you owe (£300 − £280 = **£20.00**), never below £0; past it, the app says "£X over your safe limit". The dashboard, the checkout popup and the toolbar popup all use exactly these words and this maths (`getGaugeState` in `src/account.js`, `impact` in `checkout-guard/core.js`). `test/extension-contract.test.js` fails if they ever differ. Built for people with dyscalculia: no second figure to reconcile.
-- **No percentages on screen.** One bar (share of the safe limit used, never past full) plus words. Screen readers get the same words.
+- **No percentages in the default (Simple) view.** One bar (share of the safe limit used, never past full) plus words. Screen readers get the same words. Percentages appear only in the optional **Detailed view**.
 - **Colour bands, same on both sides:** green while you owe less than 80% of the safe limit ("Within your safe limit"), amber from 80% up to the limit ("Close to your safe limit"), red over it ("Over your safe limit"). The dashboard also says "Over your card limit" above the card limit. These are interface bands, **not** a credit-score prediction.
 - **Shared numbers:** the dashboard sends the extension its safe limit and what you owe. While a dashboard tab is open, those always win: if the toolbar popup's numbers are edited or reset, they snap back. With no dashboard open, the extension uses its own saved numbers and adds each Continue to what you owe.
 - **Money always shows pence** (`£280.00`, never `£280.5`), on both sides.
@@ -63,14 +63,14 @@ React 19 and Vite 7, with no router and no state library. `App.jsx` holds the sh
 
 | Feature | What it does | Main files |
 |---|---|---|
-| Safe to spend (top card) | Headline **Safe to spend**, one bar, a status in words, and "You owe £X of your £Y safe limit. Card limit £Z." Same number and words as the extension. What you owe = starting balance + this month's purchases. | `AccountOverview.jsx`, `account.js`, `statements/monthlyBalance.js` |
+| Safe to spend (top card) | Headline **Safe to spend**, a status in words, the sum behind it (Safe limit − You owe = Safe to spend) and one bar. Same number and words as the extension. What you owe = starting balance + this month's purchases. **Detailed view** (header toggle, remembered) adds card limit, this month's purchases, % of card and safe limit used, and the colour key. The headline is identical in both views. | `AccountOverview.jsx`, `account.js`, `statements/monthlyBalance.js` |
 | Try a purchase first | Type an amount to see "After this: £X safe to spend" or "£X over your safe limit". Never changes the account. | `SafeZoneGauge.jsx`, `PurchaseProjection.jsx` |
 | Reflection queue | Checkouts paused by the extension, kept for 30 minutes. "I don't need this" removes an item and adds it to **Total Impulse Money Saved**. | `ImpulseCoolingQueue.jsx`, `coolingQueue.js`, `hooks/useCoolingQueue.js` |
 | Request Grace | Draft → edit → review → disclaimer and consent → send → status updates. The decision is simulated at random and doesn't predict a real lender. | `RequestGrace.jsx`, `grace.js` |
 | Statement analysis | Upload a text-based GBP bank statement PDF (or load the demo statement). Rows are extracted locally, categorised and reconciled against the statement's own total. You can change categories, include/exclude rows and add transactions manually. | `StatementAnalysis.jsx`, `AddTransactionForm.jsx`, `statements/*` |
 | Home spending summary | This month's saved transactions on Home, with Remove/restore. | `HomeSpendingSummary.jsx` |
 | Demo controls | Presenter-only: starting balance, credit limit, target %. | `DemoControls.jsx` |
-| Theme, menu, reset | Light/dark theme (kept across resets), navigation, **Reset demo** clears everything else. | `ThemeToggle.jsx`, `NavigationMenu.jsx` |
+| Theme, view, menu, reset | Light/dark theme and Simple/Detailed view (both kept across resets), navigation, **Reset demo** clears everything else. | `ThemeToggle.jsx`, `ViewToggle.jsx`, `NavigationMenu.jsx` |
 
 ### Statement import
 
@@ -162,6 +162,7 @@ All of the dashboard's bridge code is in `src/hooks/useExtensionBridge.js`. To s
 | `credit-guard-cooling-v1` | Reflection queue items and money saved | Yes |
 | `credit-guard-checkout-receipts-v1` | IDs of received purchases (prevents replays) | No, on purpose |
 | `credit-guard-theme` | Light/dark choice | No |
+| `credit-guard-view` | Simple/Detailed view choice | No |
 
 The account itself (balance, limit, target, support request) lives in memory only and goes back to the demo values when the page reloads.
 

@@ -7,6 +7,7 @@ import RequestGrace from './components/RequestGrace.jsx';
 import DemoControls from './components/DemoControls.jsx';
 import NavigationMenu from './components/NavigationMenu.jsx';
 import ThemeToggle from './components/ThemeToggle.jsx';
+import ViewToggle, { getInitialView } from './components/ViewToggle.jsx';
 import StatementAnalysis from './components/StatementAnalysis.jsx';
 import HomeSpendingSummary from './components/HomeSpendingSummary.jsx';
 import useSavedStatement from './hooks/useSavedStatement.js';
@@ -22,6 +23,8 @@ export default function App() {
   // Passing the function here creates the starting account on the first render.
   // Navigation changes the visible screen without discarding account data or drafts.
   const [page, setPage] = useState('home');
+  // Like the theme, the view choice is kept across Reset demo.
+  const [view, setView] = useState(getInitialView);
   const { savedStatement, updateSavedStatement, receivePurchase, storageError } = useSavedStatement();
   const { queue, addCoolingItem, dismissCoolingItem, resetCoolingQueue, coolingError } = useCoolingQueue();
   const [statementKey, setStatementKey] = useState(0);
@@ -84,6 +87,7 @@ export default function App() {
         <span className="brand">◈ &nbsp; Adaptive Credit Guard</span>
         <div className="header-actions" key={resetKey}>
           <NavigationMenu page={page} onNavigate={navigate} />
+          <ViewToggle view={view} onChange={setView} />
           <ThemeToggle />
           <button className="secondary" onClick={reset}>Reset demo</button>
         </div>
@@ -100,7 +104,7 @@ export default function App() {
       <div key={resetKey}>
         {/* Keep screens mounted so navigating home preserves the request and preview. */}
         <div hidden={page !== 'home'}>
-          <AccountOverview account={displayedAccount} />
+          <AccountOverview account={displayedAccount} detailed={view === 'detailed'} monthlyOutgoing={adjustment.outgoing} />
           <SafeZoneGauge account={displayedAccount} />
           <ImpulseCoolingQueue
             items={queue.items}
