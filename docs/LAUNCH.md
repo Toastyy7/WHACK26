@@ -53,7 +53,7 @@ The extension is the `checkout-guard/` folder. It needs no build step.
 3. Click **Load unpacked** and pick the `checkout-guard` folder.
 4. Optional: pin it with the 🧩 puzzle icon.
 
-After pulling new code or switching branch, click **↻ reload** on the CheckoutGuard card.
+After pulling new code or switching branch, click **↻ reload** on the CheckoutGuard card, then **refresh every open dashboard and shop tab**. Chrome doesn't put the reloaded extension into tabs that were already open, so those tabs stop syncing and Reset demo can't reach the extension.
 
 **Firefox**
 
@@ -98,7 +98,8 @@ Package the extension as a ZIP (for sharing or Firefox signing): `npm run pack:e
 | `Port 5173 is already in use` | Another dev server is running. Stop it (Ctrl+C), or find it with `lsof -i :5173`. |
 | Extension shows a different "left to spend" from the dashboard (e.g. £120 of £300 spent) | The dashboard isn't open on 5173/4173/3000 in the same browser profile, or the extension wasn't reloaded after an update. |
 | Purchase didn't reach the dashboard | It's queued in the extension and delivered when a dashboard tab opens (retries every 5 s). |
-| Popup doesn't appear on the test shop any more | You pressed Continue/× there in the last 30 minutes, so that shop is approved. Press **Reset demo** on the dashboard (or **Reset** in the toolbar popup) and reload the shop. |
+| Popup doesn't appear on the test shop any more | You pressed Continue/× there in the last 30 minutes, so that shop is approved. Press **Reset demo** on the dashboard (or **Reset** in the toolbar popup) and reload the shop. In Chrome, if you reloaded the extension, refresh the dashboard tab first or Reset demo can't reach it. |
+| Dashboard and extension stopped syncing in Chrome after reloading the extension | Refresh the dashboard tab and the shop tab. |
 | Popup never appears on a real shop | Detection is deliberately strict to avoid false alarms. Use the test checkout page, or check `chrome://extensions` → CheckoutGuard → **Errors**. |
 | `npm ci` errors about the lockfile | You're on an old branch. Pull, then run `npm ci` again. |
 | Blank page | You opened a `file://` URL. Use one of the servers above. |
