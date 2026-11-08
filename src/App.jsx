@@ -6,8 +6,7 @@ import ImpulseCoolingQueue from './components/ImpulseCoolingQueue.jsx';
 import RequestGrace from './components/RequestGrace.jsx';
 import DemoControls from './components/DemoControls.jsx';
 import NavigationMenu from './components/NavigationMenu.jsx';
-import ThemeToggle from './components/ThemeToggle.jsx';
-import ViewToggle, { getInitialView } from './components/ViewToggle.jsx';
+import SettingsMenu, { loadSetting } from './components/SettingsMenu.jsx';
 import StatementAnalysis from './components/StatementAnalysis.jsx';
 import HomeSpendingSummary from './components/HomeSpendingSummary.jsx';
 import useSavedStatement from './hooks/useSavedStatement.js';
@@ -23,8 +22,9 @@ export default function App() {
   // Passing the function here creates the starting account on the first render.
   // Navigation changes the visible screen without discarding account data or drafts.
   const [page, setPage] = useState('home');
-  // Like the theme, the view choice is kept across Reset demo.
-  const [view, setView] = useState(getInitialView);
+  // Like the theme, these display choices are kept across Reset demo.
+  const [view, setView] = useState(() => loadSetting('credit-guard-view', ['simple', 'detailed'], 'simple'));
+  const [font, setFont] = useState(() => loadSetting('credit-guard-font', ['default', 'dyslexic'], 'default'));
   const { savedStatement, updateSavedStatement, receivePurchase, storageError } = useSavedStatement();
   const { queue, addCoolingItem, dismissCoolingItem, resetCoolingQueue, coolingError } = useCoolingQueue();
   const [statementKey, setStatementKey] = useState(0);
@@ -40,6 +40,7 @@ export default function App() {
     currentSpent: displayedAccount.balance,
     receivePurchase,
     receiveCoolingItem: addCoolingItem,
+    font,
   });
   // Changing this key tells React to recreate the panels and clear their local state.
   const [resetKey, setResetKey] = useState(0);
@@ -87,8 +88,7 @@ export default function App() {
         <span className="brand">◈ &nbsp; Adaptive Credit Guard</span>
         <div className="header-actions" key={resetKey}>
           <NavigationMenu page={page} onNavigate={navigate} />
-          <ViewToggle view={view} onChange={setView} />
-          <ThemeToggle />
+          <SettingsMenu view={view} onView={setView} font={font} onFont={setFont} />
           <button className="secondary" onClick={reset}>Reset demo</button>
         </div>
       </header>

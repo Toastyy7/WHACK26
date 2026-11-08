@@ -104,3 +104,4 @@ Package the extension as a ZIP (for sharing or Firefox signing): `npm run pack:e
 | `npm ci` errors about the lockfile | You're on an old branch. Pull, then run `npm ci` again. |
 | Blank page | You opened a `file://` URL. Use one of the servers above. |
 | Want a clean demo | Click **Reset demo** in the dashboard header. |
+| Dyslexia-friendly font, dark mode or detailed view | **⚙ Settings** in the dashboard header. The font also switches the extension's popups (refresh the shop tab if it was already open). |

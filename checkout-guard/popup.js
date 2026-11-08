@@ -137,5 +137,13 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!dirty) apply(settings);
     } catch { notice('Could not read updated settings. Your edits are still here.', true); }
   });
+  // Follow the dashboard's Settings → Dyslexia-friendly font.
+  function applyFont() {
+    if (!guard.available()) return;
+    guard.getFont().then((font) => { document.documentElement.dataset.font = font; })
+      .catch(() => { /* keep the normal font */ });
+  }
+  applyFont();
+  guard.subscribeFont(applyFont);
   load();
 });

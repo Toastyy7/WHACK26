@@ -247,3 +247,11 @@
   background: #f8fafc !important;
   color: #0f172a !important;
 }
+
+/* Dyslexia-friendly font (dashboard Settings). The id is repeated on purpose: it must beat the
+   two-id rules above that set font with !important. */
+#checkout-guard-overlay#checkout-guard-overlay[data-font='dyslexic'],
+#checkout-guard-overlay#checkout-guard-overlay[data-font='dyslexic'] * {
+  font-family: 'OpenDyslexic', system-ui, sans-serif !important;
+  line-height: 1.6 !important;
+}

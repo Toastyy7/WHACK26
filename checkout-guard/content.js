@@ -11,6 +11,23 @@
   // shortcut: read once per page load, so an approval expiring while the page stays open is ignored.
   let approved = false;
   let active = null;
+  // Follows the dashboard's Settings → Dyslexia-friendly font.
+  let font = 'default';
+  let fontFaceAdded = false;
+  // Fonts load from the extension. A shop's strict font policy can block them; the popup then
+  // keeps the normal font, which is the safe fallback.
+  function useFont(next) {
+    font = next;
+    if (font === 'dyslexic' && !fontFaceAdded) {
+      fontFaceAdded = true;
+      const style = document.createElement('style');
+      style.id = 'checkout-guard-font';
+      style.textContent = [400, 700].map((weight) =>
+        `@font-face{font-family:'OpenDyslexic';font-weight:${weight};font-display:swap;src:url("${guard.fileUrl(`fonts/opendyslexic-${weight}.woff2`)}") format("woff2")}`).join('');
+      document.head.appendChild(style);
+    }
+    if (active) active.overlay.dataset.font = font;
+  }
   let refreshTimer = null;
   let loadVersion = 0;
 
@@ -22,6 +39,7 @@
     const previousFocus = document.activeElement;
     const overlay = document.createElement('div');
     overlay.id = 'checkout-guard-overlay';
+    overlay.dataset.font = font;
     overlay.innerHTML = `
       <section id="checkout-guard-modal" role="dialog" aria-modal="true" aria-labelledby="cg-modal-title" aria-describedby="cg-description" tabindex="-1">
         <button type="button" id="cg-close" aria-label="Close preview">×</button>
@@ -249,9 +267,10 @@
   async function loadSettings() {
     const version = ++loadVersion;
     try {
-      const [loaded, shopApproved] = await Promise.all([guard.load(), guard.isApproved(location.hostname)]);
+      const [loaded, shopApproved, savedFont] = await Promise.all([guard.load(), guard.isApproved(location.hostname), guard.getFont()]);
       if (version !== loadVersion) return;
       settings = loaded;
+      useFont(savedFont);
       approved = approved || shopApproved;
       refresh();
     } catch (error) {
@@ -301,5 +320,6 @@
   });
   window.addEventListener('pageshow', scheduleRefresh);
   guard.subscribe(loadSettings);
+  guard.subscribeFont(loadSettings);
   loadSettings();
 })();

@@ -37,3 +37,8 @@ button:disabled, fieldset:disabled { opacity: .65; cursor: wait; }
 #statusToast:empty { display: none; }
 #statusToast[data-kind='error'] { color: #991b1b; background: #fef2f2; }
 footer { margin-top: 16px; }
+
+/* Dyslexia-friendly font, following the dashboard's Settings. */
+@font-face { font-family: 'OpenDyslexic'; font-weight: 400; font-display: swap; src: url('fonts/opendyslexic-400.woff2') format('woff2'); }
+@font-face { font-family: 'OpenDyslexic'; font-weight: 700; font-display: swap; src: url('fonts/opendyslexic-700.woff2') format('woff2'); }
+:root[data-font='dyslexic'], :root[data-font='dyslexic'] * { font-family: 'OpenDyslexic', system-ui, sans-serif !important; line-height: 1.6; }

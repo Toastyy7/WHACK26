@@ -107,14 +107,31 @@ try:
         expect(overview).to_contain_text('Safe to spend£20.00')
         expect(overview).to_contain_text('Safe limit£300.00− You owe£280.00= Safe to spend£20.00')  # the sum behind the number
         expect(overview).not_to_contain_text('%')  # simple view: no percentages
-        view = page.get_by_role('button', name='Detailed view')
-        view.click()
+        settings = page.get_by_role('button', name='⚙ Settings')
+        settings.click()
+        view = page.get_by_role('switch', name='Detailed view')
+        page.locator('.setting span', has_text='Detailed view').click()  # clicking the words alone must toggle
+        expect(view).to_be_checked()
+        expect(page.locator('#settings-panel')).to_be_visible()  # and the menu stays open
         expect(overview).to_contain_text('Card limit used28%')
         expect(overview).to_contain_text('Safe to spend£20.00')  # same headline in both views
         page.reload()
-        expect(view).to_have_attribute('aria-pressed', 'true')  # remembered
-        view.click()
+        settings.click()
+        expect(view).to_be_checked()  # remembered
+        view.uncheck()
         expect(overview).not_to_contain_text('%')
+        # Dyslexia-friendly font: applies everywhere, really loads, and is remembered.
+        font = page.get_by_role('switch', name='Dyslexia-friendly font (OpenDyslexic)')
+        font.check()
+        expect(page.locator('html')).to_have_attribute('data-font', 'dyslexic')
+        assert 'OpenDyslexic' in page.evaluate("getComputedStyle(document.querySelector('.overview strong')).fontFamily")
+        page.wait_for_function("document.fonts.check('16px OpenDyslexic')")
+        page.reload()
+        expect(page.locator('html')).to_have_attribute('data-font', 'dyslexic')
+        page.get_by_role('button', name='⚙ Settings').click()
+        page.get_by_role('switch', name='Dyslexia-friendly font (OpenDyslexic)').uncheck()
+        page.keyboard.press('Escape')
+        expect(page.locator('html')).to_have_attribute('data-font', 'default')
         for purchase, words, zone in [('10', '£10.00 safe to spend', 'amber'), ('20', '£0.00 safe to spend', 'amber'),
                                       ('50', '£30.00 over your safe limit', 'red'), ('800', '£780.00 over your safe limit', 'red')]:
             amount.fill(purchase)
@@ -144,7 +161,7 @@ try:
         page.set_viewport_size({'width': 375, 'height': 900})
         amount.fill('50')
         assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
-        print('PASS dashboard: safe-to-spend sum, simple/detailed view, preview bands, invalid input, reflection savings, Request Grace send, reset, mobile, nested offline path')
+        print('PASS dashboard: safe-to-spend sum, settings menu (detailed view, OpenDyslexic font), preview bands, invalid input, reflection savings, Request Grace send, reset, mobile, nested offline path')
 
         extension = browser.new_context()
         extension.add_init_script(MOCK_STORAGE)
@@ -363,11 +380,20 @@ try:
         toolbar.locator('#resetBtn').click()
         expect(toolbar.locator('#remainingAmount')).to_have_text('£20.00', timeout=5000)  # not the £180.00 extension default
         expect(toolbar.locator('#owedDetail')).to_have_text('You owe £280.00 of your £300.00 safe limit.')
+        # Turning on the font on the dashboard reaches both extension popups.
+        dash.bring_to_front()
+        dash.get_by_role('button', name='⚙ Settings').click()
+        dash.get_by_role('switch', name='Dyslexia-friendly font (OpenDyslexic)').check()
+        expect(toolbar.locator('html')).to_have_attribute('data-font', 'dyslexic', timeout=5000)
+        assert 'OpenDyslexic' in toolbar.evaluate("getComputedStyle(document.querySelector('button')).fontFamily")
+        expect(shop.locator('#checkout-guard-overlay')).to_have_attribute('data-font', 'dyslexic', timeout=5000)
+        assert 'OpenDyslexic' in shop.evaluate("getComputedStyle(document.querySelector('#cg-budget-status')).fontFamily")
+        shop.wait_for_function("document.fonts.check('16px OpenDyslexic')", timeout=5000)  # really loaded from the extension
         real.close()
         dash_server.shutdown()
         dash_server.server_close()
         assert not errors, errors
-        print('PASS real extension: shared budget, Continue updates both sides, approved shop stays quiet, Reset demo re-arms it, popup Reset keeps dashboard numbers, Leave checkout reaches the reflection queue')
+        print('PASS real extension: shared budget, Continue updates both sides, approved shop stays quiet, Reset demo re-arms it, popup Reset keeps dashboard numbers, font reaches both popups, Leave checkout reaches the reflection queue')
         print('PASS no browser JavaScript errors')
 finally:
     server.shutdown()

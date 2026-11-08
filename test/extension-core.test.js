@@ -156,3 +156,15 @@ test('clearing approvals makes every shop pause again (used by Reset demo)', asy
   assert.equal(await guard.isApproved('other.example', now), false);
   assert.equal(values.monthlyBudget, 300);  // settings untouched
 });
+
+test('font preference is stored separately from budget settings and validated', async () => {
+  const { guard, values } = memoryGuard({ monthlyBudget: 300, currentSpent: 120 });
+  assert.equal(await guard.getFont(), 'default');
+  await guard.setFont('dyslexic');
+  assert.equal(await guard.getFont(), 'dyslexic');
+  await guard.save({ ...guard.defaults, currentSpent: 50 });  // popup saving budgets must not reset the font
+  assert.equal(await guard.getFont(), 'dyslexic');
+  await assert.rejects(guard.setFont('comic-sans'));
+  values['checkoutGuard.font'] = 'garbage';
+  assert.equal(await guard.getFont(), 'default');
+});
