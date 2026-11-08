@@ -3,7 +3,7 @@ import App from './App.jsx';
 import AuthScreen from './components/AuthScreen.jsx';
 import useAuth from './auth/useAuth.js';
 import { scopedStorage } from './auth/scopedStorage.js';
-import { loadSetting } from './components/SettingsMenu.jsx';
+import { effectiveDisplayPreferences, loadDisplayPreferences } from './preferences.js';
 
 // Decides what to show: loading → log-in screen → the dashboard for an account or a guest.
 // Each account gets its own browser storage; key={…} remounts the dashboard on switch.
@@ -12,11 +12,12 @@ export default function AccountGate() {
   const userId = auth.user?.id ?? null;
   const storage = useMemo(() => scopedStorage(() => window.localStorage, userId), [userId]);
 
-  // The Settings menu applies theme and font inside the dashboard; apply saved ones here too.
+  // The dashboard applies display preferences itself; apply the saved ones to the log-in screen too.
   useLayoutEffect(() => {
-    document.documentElement.dataset.theme = loadSetting('credit-guard-theme', ['light', 'dark'],
-      window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-    document.documentElement.dataset.font = loadSetting('credit-guard-font', ['default', 'dyslexic'], 'default');
+    let saved;
+    try { saved = loadDisplayPreferences(localStorage, window.matchMedia('(prefers-color-scheme: dark)').matches); }
+    catch { saved = loadDisplayPreferences(null); }
+    for (const [key, value] of Object.entries(effectiveDisplayPreferences(saved))) document.documentElement.dataset[key] = String(value);
   }, []);
 
   if (auth.status === 'loading') return <main className="auth"><p role="status">Loading…</p></main>;

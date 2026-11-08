@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useLayoutEffect } from 'react';
 import { createInitialAccount, getGaugeState } from './account.js';
 import AccountOverview from './components/AccountOverview.jsx';
 import SafeZoneGauge from './components/SafeZoneGauge.jsx';
@@ -6,7 +6,8 @@ import ImpulseCoolingQueue from './components/ImpulseCoolingQueue.jsx';
 import RequestGrace from './components/RequestGrace.jsx';
 import DemoControls from './components/DemoControls.jsx';
 import NavigationMenu from './components/NavigationMenu.jsx';
-import SettingsMenu, { loadSetting } from './components/SettingsMenu.jsx';
+import SettingsMenu from './components/SettingsMenu.jsx';
+import { loadDisplayPreferences, saveDisplayPreferences, effectiveDisplayPreferences } from './preferences.js';
 import StatementAnalysis from './components/StatementAnalysis.jsx';
 import HomeSpendingSummary from './components/HomeSpendingSummary.jsx';
 import useSavedStatement from './hooks/useSavedStatement.js';
@@ -25,8 +26,18 @@ export default function App({ session = {} }) {
   // Navigation changes the visible screen without discarding account data or drafts.
   const [page, setPage] = useState('home');
   // Like the theme, these display choices are kept across Reset demo.
-  const [view, setView] = useState(() => loadSetting('credit-guard-view', ['simple', 'detailed'], 'simple'));
-  const [font, setFont] = useState(() => loadSetting('credit-guard-font', ['default', 'dyslexic'], 'default'));
+  const [preferences, setPreferences] = useState(() => {
+    try { return loadDisplayPreferences(localStorage, window.matchMedia('(prefers-color-scheme: dark)').matches); }
+    catch { return loadDisplayPreferences(null); }
+  });
+  const [storageSaved, setStorageSaved] = useState(true);
+  const display = effectiveDisplayPreferences(preferences);
+  const { view, font } = display;
+  useLayoutEffect(() => {
+    for (const [key, value] of Object.entries(effectiveDisplayPreferences(preferences))) document.documentElement.dataset[key] = String(value);
+    try { setStorageSaved(saveDisplayPreferences(localStorage, preferences)); }
+    catch { setStorageSaved(false); }
+  }, [preferences]);
   const { savedStatement, updateSavedStatement, receivePurchase, storageError } = useSavedStatement(session.storage);
   const { queue, addCoolingItem, dismissCoolingItem, resetCoolingQueue, coolingError } = useCoolingQueue(session.storage);
   const [statementKey, setStatementKey] = useState(0);
@@ -45,6 +56,8 @@ export default function App({ session = {} }) {
     receivePurchase,
     receiveCoolingItem: addCoolingItem,
     font,
+    displayPreferences: display,
+    cardLimit: account.limit,
   });
   // Changing this key tells React to recreate the panels and clear their local state.
   const [resetKey, setResetKey] = useState(0);
@@ -92,7 +105,7 @@ export default function App({ session = {} }) {
         <span className="brand">◈ &nbsp; Adaptive Credit Guard</span>
         <div className="header-actions" key={resetKey}>
           <NavigationMenu page={page} onNavigate={navigate} />
-          <SettingsMenu view={view} onView={setView} font={font} onFont={setFont} />
+          <SettingsMenu preferences={preferences} onChange={setPreferences} storageSaved={storageSaved} />
           <button className="secondary" onClick={reset}>Reset demo</button>
           {session.user ? (<>
             <span className="account-chip">Signed in as <strong>{session.user.username}</strong></span>
@@ -120,8 +133,8 @@ export default function App({ session = {} }) {
       <div key={resetKey}>
         {/* Keep screens mounted so navigating home preserves the request and preview. */}
         <div hidden={page !== 'home'}>
-          <AccountOverview account={displayedAccount} detailed={view === 'detailed'} monthlyOutgoing={adjustment.outgoing} />
-          <SafeZoneGauge account={displayedAccount} />
+          <AccountOverview account={displayedAccount} detailed={view === 'detailed'} monthlyOutgoing={adjustment.outgoing} balanceFigure={display.balanceFigure} />
+          <SafeZoneGauge account={displayedAccount} balanceFigure={display.balanceFigure} />
           <ImpulseCoolingQueue
             items={queue.items}
             savings={queue.savings}

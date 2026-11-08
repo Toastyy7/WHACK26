@@ -10,6 +10,8 @@ document.addEventListener('DOMContentLoaded', () => {
   let saved = { ...guard.defaults };
   let dirty = false;
   let busy = false;
+  let cardLimit = null;
+  let display = guard.displayPreferences();
 
   function notice(message, error = false) {
     find('statusToast').textContent = message;
@@ -35,10 +37,15 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   function preview() {
     const settings = readAmounts();
+    const figure = guard.getBalanceFigure(display.balanceFigure, { safeLimit: settings ? guard.pence(settings.monthlyBudget) : 0, owed: settings ? guard.pence(settings.currentSpent) : 0, cardLimit });
+    find('balanceLabel').textContent = figure.label;
+    find('balanceExplanation').textContent = figure.description;
+    find('safeSummary').hidden = !settings || display.balanceFigure === 'safe-to-spend';
     const meter = find('budgetMeter');
     if (!settings) {
       find('remainingAmount').textContent = '—';
       find('owedDetail').textContent = '';
+      find('extraDetail').hidden = true;
       find('budgetStatus').textContent = 'Check amounts: enter a safe limit above £0 and what you owe, with up to two decimal places.';
       find('budgetProgress').style.width = '0%';
       meter.setAttribute('aria-valuenow', '0');
@@ -46,7 +53,11 @@ document.addEventListener('DOMContentLoaded', () => {
       return null;
     }
     const result = guard.impact(settings);
-    find('remainingAmount').textContent = guard.money(result.remaining);
+    find('extraDetail').hidden = display.view !== 'detailed';
+    find('extraDetail').textContent = `${Math.round(result.percentage)}% of your safe limit used.`;
+    find('remainingAmount').textContent = figure.amount === null ? 'Not available' : guard.money(figure.amount);
+    if (figure.amount === null) find('balanceExplanation').textContent = 'Open the dashboard to sync your full card limit.';
+    find('safeSummary').textContent = `Safe to spend: ${guard.money(result.remaining)}.`;
     // Same sentence as the dashboard's overview card.
     find('owedDetail').textContent = `You owe ${guard.money(guard.pence(settings.currentSpent))} of your ${guard.money(guard.pence(settings.monthlyBudget))} safe limit.`;
     find('budgetStatus').textContent = result.label;
@@ -57,6 +68,7 @@ document.addEventListener('DOMContentLoaded', () => {
     return settings;
   }
   function apply(settings) {
+    if ('cardLimit' in settings) cardLimit = settings.cardLimit;
     toggle.checked = settings.isEnabled;
     budgetInput.value = settings.monthlyBudget;
     spentInput.value = settings.currentSpent;
@@ -132,18 +144,23 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       const settings = await guard.load();
       saved = settings;
+      cardLimit = settings.cardLimit;
       toggle.checked = settings.isEnabled;
       enabledLabel();
       if (!dirty) apply(settings);
+      else preview();
     } catch { notice('Could not read updated settings. Your edits are still here.', true); }
   });
-  // Follow the dashboard's Settings → Dyslexia-friendly font.
-  function applyFont() {
+  // Follow every dashboard display choice, including while this popup is open.
+  async function applyDisplay() {
     if (!guard.available()) return;
-    guard.getFont().then((font) => { document.documentElement.dataset.font = font; })
-      .catch(() => { /* keep the normal font */ });
+    try {
+      display = await guard.getDisplayPreferences();
+      guard.applyDisplayPreferences(document.documentElement, display);
+      preview();
+    } catch { notice('Could not load display choices. Reopen this popup to try again.', true); }
   }
-  applyFont();
-  guard.subscribeFont(applyFont);
+  applyDisplay();
+  guard.subscribeDisplayPreferences(applyDisplay);
   load();
 });

@@ -113,6 +113,18 @@ function memoryGuard(values = {}) {
   return { guard: core({ browser: { storage: { local } } }), values };
 }
 
+test('full card limit sync is validated, independent of safe limit, and survives popup edits', async () => {
+  const { guard } = memoryGuard();
+  await guard.applySnapshot({ monthlyBudget: 30000, currentSpent: 28000, cardLimit: 100000 });
+  assert.equal((await guard.load()).cardLimit, 100000);
+  await guard.save({ ...guard.defaults, currentSpent: 290 });
+  assert.equal((await guard.load()).cardLimit, 100000);
+  await assert.rejects(guard.applySnapshot({ monthlyBudget: 30000, currentSpent: 28000, cardLimit: '100000' }));
+  assert.equal((await guard.load()).cardLimit, 100000);
+  await guard.applySnapshot({ monthlyBudget: 30000, currentSpent: 28000 });
+  assert.equal((await guard.load()).cardLimit, null); // an older dashboard must not leave a stale limit
+});
+
 test('continuing a checkout adds the purchase to this month\'s spend straight away', async () => {
   const { guard } = memoryGuard({ monthlyBudget: 300, currentSpent: 120 });
   await guard.recordSpend(6999);

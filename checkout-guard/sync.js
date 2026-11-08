@@ -45,11 +45,23 @@
   window.addEventListener('message', async (event) => {
     if (event.source !== window || event.origin !== location.origin || event.data?.source !== 'credit-guard-dashboard') return;
     if (event.data.type === 'preferences') {
-      try { if (await guard.getFont() !== event.data.font) await guard.setFont(event.data.font); } catch (error) { console.warn('[CheckoutGuard] Font not applied:', error.message); }
+      try {
+        // The dashboard re-announces every few seconds: only save when something changed,
+        // otherwise every open tab would reload its settings each time.
+        if (event.data.display !== undefined) {
+          const current = await guard.getDisplayPreferences();
+          if (JSON.stringify(current) !== JSON.stringify(guard.displayPreferences(event.data.display))) {
+            await guard.setDisplayPreferences(event.data.display);
+          }
+        } else if (await guard.getFont() !== event.data.font) {
+          // Older dashboard builds send only font; keep that migration path working.
+          await guard.setFont(event.data.font);
+        }
+      } catch (error) { console.warn('[CheckoutGuard] Display choices not applied:', error.message); }
     } else if (event.data.type === 'reset') {
       try { await guard.clearApprovals(); } catch (error) { console.warn('[CheckoutGuard] Reset not applied:', error.message); }
     } else if (event.data.type === 'snapshot') {
-      snapshot = { monthlyBudget: event.data.monthlyBudget, currentSpent: event.data.currentSpent };
+      snapshot = { monthlyBudget: event.data.monthlyBudget, currentSpent: event.data.currentSpent, cardLimit: event.data.cardLimit };
       await applySnapshot();
     } else if (event.data.type === 'ready') {
       ready = true;
@@ -72,7 +84,7 @@
     if (!snapshot) return;
     try {
       const settings = await guard.load();
-      if (guard.pence(settings.monthlyBudget) !== snapshot.monthlyBudget || guard.pence(settings.currentSpent) !== snapshot.currentSpent) {
+      if (guard.pence(settings.monthlyBudget) !== snapshot.monthlyBudget || guard.pence(settings.currentSpent) !== snapshot.currentSpent || settings.cardLimit !== (snapshot.cardLimit ?? null)) {
         await applySnapshot();
       }
     } catch (error) { console.warn('[CheckoutGuard] Could not check dashboard numbers:', error.message); }

@@ -15,14 +15,17 @@
     </label>
   </header>
   <main>
-    <section class="card" aria-label="Safe to spend">
-      <div class="budget-summary"><span>Safe to spend</span></div>
-      <p id="remainingAmount" class="remaining-val">—</p>
+    <section class="card" aria-label="Your balance">
+      <div aria-live="polite" aria-atomic="true"><div class="budget-summary"><span id="balanceLabel">Safe to spend</span></div>
+      <p id="remainingAmount" class="remaining-val">—</p></div>
+      <p id="balanceExplanation"></p>
+      <p id="safeSummary" hidden></p>
       <div id="budgetMeter" class="progress-bar" role="meter" aria-label="Safe limit used" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
         <div id="budgetProgress" class="progress-fill" data-zone="safe"></div>
       </div>
       <p id="budgetStatus" role="status"></p>
       <p id="owedDetail"></p>
+      <p id="extraDetail" hidden></p>
     </section>
     <form id="settingsForm">
       <fieldset id="settingsFields" disabled>
@@ -47,7 +50,7 @@
     </form>
     <p id="statusToast" role="status" aria-live="polite"></p>
     <button id="retryLoad" type="button" class="secondary" hidden>Retry loading settings</button>
-    <footer>Green below 80% · amber up to 100% · red over budget.<br>Amounts in GBP. Settings stay in this browser.</footer>
+    <footer>Safe to spend = safe limit minus what you owe.<br>Amounts in GBP. Change display choices in the website’s Settings; they apply here too.</footer>
   </main>
   <script src="core.js"></script>
   <script src="popup.js"></script>

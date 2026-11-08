@@ -1,20 +1,25 @@
 import React from 'react';
 import { getGaugeState } from '../account.js';
 import { formatMoney, formatPercent } from '../utils/format.js';
+import { getBalanceFigure } from '../balanceFigure.js';
 
-// The one number the app is built around. The extension shows the same number in
-// the same words (checkout-guard/content.js and popup.html), so they never disagree.
-// The sum on the right shows where it comes from; Detailed view adds card details.
-export default function AccountOverview({ account, detailed = false, monthlyOutgoing = 0 }) {
+// The chosen headline is shared with the extension. The safe-limit sum and gauge
+// remain visible so the full card allowance cannot be mistaken for safe to spend.
+export default function AccountOverview({ account, detailed = false, monthlyOutgoing = 0, balanceFigure = 'safe-to-spend' }) {
   const { balance, limit, target } = account;
   const owed = Math.max(0, balance);
   const gauge = getGaugeState(balance, limit, target);
   const status = gauge.over ? `${formatMoney(gauge.over)} over your safe limit` : gauge.label;
+  const figure = getBalanceFigure(balanceFigure, { safeLimit: gauge.threshold, owed, cardLimit: limit });
   return (
     <section className="overview" aria-label="Account overview">
       <div className="overview-main">
-        <span>Safe to spend</span>
-        <strong aria-live="polite">{formatMoney(gauge.safeToSpend)}</strong>
+        <div className="balance-headline" aria-live="polite" aria-atomic="true">
+          <span>{figure.label}</span>
+          <strong>{formatMoney(figure.amount)}</strong>
+        </div>
+        <p className="balance-explanation">{figure.description}</p>
+        {balanceFigure !== 'safe-to-spend' && <p className="balance-safe">Safe to spend: <b>{formatMoney(gauge.safeToSpend)}</b></p>}
         <p className={`badge zone-${gauge.zone}`}>{status}</p>
       </div>
       <dl className="overview-sum">
