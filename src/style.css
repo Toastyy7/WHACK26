@@ -408,10 +408,50 @@ td select { min-width: 210px; margin: 0; }
 .celebrate-btn { background: #16823c; border-color: #16823c; color: #fff; font-size: 0.88rem; }
 .empty-cooling { background: var(--soft); border: 1px dashed var(--line); border-radius: 10px; padding: 16px; text-align: center; }
 
-/* Settings menu: one row per switch. */
-.settings-panel { min-width: 260px; padding: 8px; }
-.setting { display: flex; align-items: center; gap: 10px; padding: 8px; font-weight: 600; cursor: pointer; }
-.setting input { width: 20px; height: 20px; flex-shrink: 0; accent-color: var(--brand-blue); }
+/* Settings menu: one row per setting, label left, switch right; the whole row is clickable. */
+.settings-panel { width: min(320px, calc(100vw - 32px)); padding: 6px; gap: 0; }
+.setting {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 48px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.setting + .setting { border-top: 1px solid var(--line); border-top-left-radius: 0; border-top-right-radius: 0; }
+.setting:hover { background: var(--soft); }
+.setting input[type='checkbox'] {
+  appearance: none;
+  flex-shrink: 0;
+  position: relative;
+  width: 46px;
+  height: 26px;
+  margin: 0;
+  border: 2px solid var(--input-border);
+  border-radius: 999px;
+  background: var(--track);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.setting input[type='checkbox']::before {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--input-border);
+  transition: transform 0.15s, background 0.15s;
+}
+.setting input[type='checkbox']:checked { background: var(--button); border-color: var(--button); }
+.setting input[type='checkbox']:checked::before { transform: translateX(20px); background: var(--button-text); }
+@media (prefers-reduced-motion: reduce) {
+  .setting input[type='checkbox'], .setting input[type='checkbox']::before { transition: none; }
+}
 
 /* Dyslexia-friendly font: OpenDyslexic (already wide) with a little more room between lines. */
 :root[data-font='dyslexic'] {

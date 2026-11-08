@@ -60,8 +60,9 @@ export default function SettingsMenu({ view, onView, font, onFont }) {
       <div id="settings-panel" className="navigation-options settings-panel" role="group" aria-label="Settings" hidden={!open}>
         {switches.map(([label, on, set]) => (
           <label key={label} className="setting">
+            <span>{label}</span>
+            {/* A real checkbox styled as a switch: keyboard, screen readers and forms keep working. */}
             <input type="checkbox" role="switch" checked={on} onChange={(event) => set(event.target.checked)} />
-            {label}
           </label>
         ))}
       </div>
