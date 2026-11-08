@@ -103,14 +103,33 @@ try:
         page = context.new_page()
         page.goto(base + '/dist/')  # nested path proves the offline build works from any folder
         amount = page.get_by_label('What would a purchase cost (£)?')
-        meter = page.get_by_role('meter')
         overview = page.get_by_role('region', name='Account overview')
+        meter = overview.get_by_role('meter', name='Safe limit used', exact=True)
         projection = page.locator('#projection')
+        comparison = projection.get_by_role('group', name='Purchase impact comparison')
+        before_meter = projection.get_by_role('meter', name='Safe limit used now', exact=True)
+        after_meter = projection.get_by_role('meter', name='Safe limit used after this purchase', exact=True)
         expect(overview).to_contain_text('£280')
         expect(meter).to_have_attribute('aria-valuenow', '93')  # £280 owed of a £300 safe limit
         expect(overview).to_contain_text('Safe to spend£20.00')
         expect(overview).to_contain_text('Safe limit£300.00− You owe£280.00= Safe to spend£20.00')  # the sum behind the number
         expect(overview).not_to_contain_text('%')  # simple view: no percentages
+        expect(projection.get_by_role('meter')).to_have_count(0)
+        amount.fill('10')
+        expect(comparison).to_be_visible()
+        expect(before_meter).to_have_attribute('aria-valuenow', '93')
+        expect(after_meter).to_have_attribute('aria-valuenow', '97')
+        for preview_meter in (before_meter, after_meter):
+            expect(preview_meter).to_have_attribute('aria-valuemin', '0')
+            expect(preview_meter).to_have_attribute('aria-valuemax', '100')
+        assert abs(before_meter.bounding_box()['width'] - after_meter.bounding_box()['width']) <= 1
+        assert abs(before_meter.locator('.gauge-fill').evaluate('el => parseFloat(el.style.width)') - 28000 / 300) < .001
+        assert abs(after_meter.locator('.gauge-fill').evaluate('el => parseFloat(el.style.width)') - 29000 / 300) < .001
+        expect(before_meter).to_have_attribute('aria-valuetext', re.compile(r'£280\.00.*£300\.00'))
+        expect(after_meter).to_have_attribute('aria-valuetext', re.compile(r'£290\.00.*£300\.00'))
+        expect(projection).not_to_contain_text('%')
+        amount.fill('')
+        expect(projection.get_by_role('meter')).to_have_count(0)
         settings = page.get_by_role('button', name='⚙ Settings')
         settings.click()
         headline_choice = page.get_by_label('Main balance number')
@@ -123,6 +142,9 @@ try:
             amount.fill('50')
             expect(projection).to_contain_text(label + ' after this: ' + ('£670.00' if value == 'card-remaining' else '£330.00'))
             expect(projection).to_contain_text('£30.00 over your safe limit')
+            expect(before_meter).to_have_attribute('aria-valuenow', '93')
+            expect(after_meter).to_have_attribute('aria-valuenow', '100')
+            assert after_meter.locator('.gauge-fill').evaluate('el => getComputedStyle(el).backgroundColor') == 'rgb(187, 37, 37)'
             settings.click()
         page.reload()
         settings.click()
@@ -197,17 +219,60 @@ try:
         page.keyboard.press('Escape')
         page.emulate_media(reduced_motion='no-preference')
         print('PASS advanced settings: centred dialog, focus trap/return, text size, spacing, reduced motion, dark mode, reload/reset persistence, retained choices and mobile with OpenDyslexic')
-        for purchase, words, zone in [('10', '£10.00 safe to spend', 'amber'), ('20', '£0.00 safe to spend', 'amber'),
-                                      ('50', '£30.00 over your safe limit', 'red'), ('800', '£780.00 over your safe limit', 'red')]:
+        for purchase, words, zone, used, owed in [('0', '£20.00 safe to spend', 'amber', '93', '£280.00'),
+                                      ('10', '£10.00 safe to spend', 'amber', '97', '£290.00'),
+                                      ('20', '£0.00 safe to spend', 'amber', '100', '£300.00'),
+                                      ('20.01', '£0.01 over your safe limit', 'red', '100', '£300.01'),
+                                      ('50', '£30.00 over your safe limit', 'red', '100', '£330.00'),
+                                      ('800', '£780.00 over your safe limit', 'red', '100', '£1,080.00')]:
             amount.fill(purchase)
             expect(projection).to_contain_text('After this: ' + words)
             expect(projection.locator('.badge')).to_have_class(f'badge zone-{zone}')
+            expect(before_meter).to_have_attribute('aria-valuenow', '93')
+            assert before_meter.locator('.gauge-fill').evaluate('el => getComputedStyle(el).backgroundColor') == 'rgb(166, 94, 0)'
+            expect(after_meter).to_have_attribute('aria-valuenow', used)
+            expected_colour = 'rgb(166, 94, 0)' if zone == 'amber' else 'rgb(187, 37, 37)'
+            assert after_meter.locator('.gauge-fill').evaluate('el => getComputedStyle(el).backgroundColor') == expected_colour
+            expect(after_meter).to_have_attribute('aria-valuetext', re.compile(re.escape(owed)))
+            expect(after_meter).to_have_attribute('aria-valuetext', re.compile(re.escape(words)))
+            expect(meter).to_have_attribute('aria-valuenow', '93')
+            expect(projection).not_to_contain_text('%')
             expect(overview).to_contain_text('£280')  # a preview never changes the account
         expect(projection).to_contain_text('Over your card limit')
-        for invalid in ['-1', '12.345', 'not money']:
+        # Recompute from live account props as well as the typed purchase.
+        page.get_by_text('Demo controls', exact=True).click()
+        starting_balance = page.get_by_label(re.compile('Owed at the start of this month'))
+        starting_balance.fill('100')
+        starting_balance.press('Tab')
+        amount.fill('10')
+        expect(before_meter).to_have_attribute('aria-valuenow', '33')
+        expect(after_meter).to_have_attribute('aria-valuenow', '37')
+        expect(projection.locator('.badge')).to_have_class('badge zone-green')
+        assert after_meter.locator('.gauge-fill').evaluate('el => getComputedStyle(el).backgroundColor') == 'rgb(24, 116, 58)'
+        credit_limit = page.get_by_label('Credit limit (£)', exact=True)
+        credit_limit.fill('2000')
+        credit_limit.press('Tab')
+        expect(comparison).to_contain_text('Both bars use your £600.00 safe limit')
+        expect(before_meter).to_have_attribute('aria-valuenow', '17')
+        expect(after_meter).to_have_attribute('aria-valuenow', '18')
+        credit_limit.fill('1000')
+        credit_limit.press('Tab')
+        starting_balance.fill('280')
+        starting_balance.press('Tab')
+        page.get_by_text('Demo controls', exact=True).click()
+        expect(meter).to_have_attribute('aria-valuenow', '93')
+        for invalid in ['-1', '12.345', 'not money', '   ']:
             amount.fill(invalid)
             expect(projection).to_contain_text('Enter pounds')
+            expect(projection.get_by_role('meter')).to_have_count(0)
         page.get_by_role('button', name='Clear preview').click()
+        expect(projection.get_by_role('meter')).to_have_count(0)
+        amount.fill('20.01')
+        amount.press('Tab')
+        expect(page.get_by_role('button', name='Clear preview')).to_be_focused()
+        page.keyboard.press('Enter')
+        expect(amount).to_have_value('')
+        expect(projection.get_by_role('meter')).to_have_count(0)
         # Saying no to a paused checkout counts as money saved.
         page.get_by_role('button', name=re.compile("I don't need this")).first.click()
         expect(page.get_by_text('Total Impulse Money Saved: £69.99')).to_be_visible()
@@ -222,10 +287,31 @@ try:
         expect(page.get_by_text('Request received · awaiting review')).to_be_visible()
         page.get_by_role('button', name='Reset demo', exact=True).click()
         expect(amount).to_have_value('')
+        expect(projection.get_by_role('meter')).to_have_count(0)
         expect(meter).to_have_attribute('aria-valuenow', '93')  # £280 owed of a £300 safe limit
         page.set_viewport_size({'width': 375, 'height': 900})
         amount.fill('50')
         assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
+        expect(comparison).to_be_visible()
+        expect(before_meter).to_have_attribute('aria-valuenow', '93')
+        expect(after_meter).to_have_attribute('aria-valuenow', '100')
+        settings.click()
+        page.get_by_role('switch', name='Advanced Mode').check()
+        page.get_by_label('Text size', exact=False).select_option('extra-large')
+        page.get_by_role('switch', name='Comfortable spacing').check()
+        page.get_by_role('switch', name='Reduce motion', exact=True).check()
+        page.get_by_role('switch', name='Dark mode').check()
+        page.get_by_role('switch', name='Dyslexia-friendly font (OpenDyslexic)').check()
+        page.keyboard.press('Escape')
+        assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
+        assert 'OpenDyslexic' in before_meter.evaluate('el => getComputedStyle(el).fontFamily')
+        for preview_meter in (before_meter, after_meter):
+            assert preview_meter.evaluate('el => el.scrollWidth <= el.clientWidth')
+            assert preview_meter.locator('.gauge-fill').evaluate('el => getComputedStyle(el).transitionDuration') == '0s'
+        page.emulate_media(reduced_motion='reduce')
+        assert after_meter.locator('.gauge-fill').evaluate('el => getComputedStyle(el).animationName') == 'none'
+        page.emulate_media(reduced_motion='no-preference')
+        print('PASS purchase comparison: exact penny boundary, unchanged account, same safe-limit scale for all headlines, clear/reset, keyboard, mobile, theme/font and reduced motion')
         print('PASS dashboard: safe-to-spend sum, settings menu (detailed view, OpenDyslexic font), preview bands, invalid input, reflection savings, Request Grace send, reset, mobile, nested offline path')
 
         extension = browser.new_context()
