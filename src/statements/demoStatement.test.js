@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { getDemoStatement } from './demoStatement.js';
+import { categories } from './categories.js';
 
 test('demo statement provides valid categorized transactions with matching declared total', () => {
   const statement = getDemoStatement();
@@ -17,7 +18,7 @@ test('demo statement provides valid categorized transactions with matching decla
     assert.ok(tx.date);
     assert.ok(tx.description);
     assert.ok(Number.isSafeInteger(tx.amount) && tx.amount > 0);
-    assert.ok(tx.category);
+    assert.ok(categories.includes(tx.category), tx.category);  // must match a real dropdown option
     assert.equal(tx.included, true);
   }
 });

@@ -13,7 +13,7 @@ function memoryStorage() {
   return { getItem: (key) => data.get(key) ?? null, setItem: (key, value) => data.set(key, value), removeItem: (key) => data.delete(key) };
 }
 
-test('checkout adds a dated transaction, deducts once, and does not alter PDF reconciliation', () => {
+test('checkout adds a dated transaction, adds to the balance once, and does not alter PDF reconciliation', () => {
   const storage = memoryStorage();
   const initial = { fileName: 'statement.pdf', result: { transactions: [{ id: 'pdf-row', amount: 1000, date: '1 Oct 26', isoDate: '2026-10-01', description: 'Groceries', category: 'Groceries' }], declaredTotal: 1000 } };
   saveStatement(storage, initial);
@@ -21,7 +21,7 @@ test('checkout adds a dated transaction, deducts once, and does not alter PDF re
   assert.equal(next.result.transactions.length, 2);
   assert.equal(next.result.transactions[1].source, 'checkout');
   assert.equal(next.result.transactions[1].status, 'planned');
-  assert.equal(monthlyBalance(28000, next.result.transactions, '2026-11').balance, 21001);
+  assert.equal(monthlyBalance(28000, next.result.transactions, '2026-11').balance, 34999);
   assert.equal(importedTransactions(next.result.transactions).length, 1);
   assert.equal(receiveCheckout(storage, next, purchase).result.transactions.length, 2);
   assert.equal(loadStatement(storage).result.transactions.length, 2);

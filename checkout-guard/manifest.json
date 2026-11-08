@@ -31,6 +31,7 @@
       ],
       "js": [
         "core.js",
+        "detect.js",
         "sync.js",
         "content.js"
       ],

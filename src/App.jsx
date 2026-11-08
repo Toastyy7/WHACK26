@@ -14,7 +14,7 @@ import { setTransactionIncluded } from './statements/selection.js';
 import { monthlyBalance } from './statements/monthlyBalance.js';
 import useCurrentMonth from './hooks/useCurrentMonth.js';
 import useCoolingQueue from './hooks/useCoolingQueue.js';
-import useExtensionSnapshot from './hooks/useExtensionSnapshot.js';
+import useExtensionBridge from './hooks/useExtensionBridge.js';
 
 // App owns the data shared by the panels below. Props pass that data to each panel.
 export default function App() {
@@ -22,7 +22,7 @@ export default function App() {
   // Passing the function here creates the starting account on the first render.
   // Navigation changes the visible screen without discarding account data or drafts.
   const [page, setPage] = useState('home');
-  const { savedStatement, updateSavedStatement, storageError } = useSavedStatement();
+  const { savedStatement, updateSavedStatement, receivePurchase, storageError } = useSavedStatement();
   const { queue, addCoolingItem, dismissCoolingItem, resetCoolingQueue, coolingError } = useCoolingQueue();
   const [statementKey, setStatementKey] = useState(0);
   const heading = useRef(null);
@@ -31,7 +31,12 @@ export default function App() {
   const adjustment = monthlyBalance(account.balance, savedStatement?.result.transactions ?? [], month);
   const displayedAccount = { ...account, balance: adjustment.balance };
   // Extension budget = the target amount; extension spend = this month's dashboard spending.
-  useExtensionSnapshot(Math.ceil((account.limit * account.target) / 100), adjustment.outgoing);
+  useExtensionBridge({
+    monthlyBudget: Math.ceil((account.limit * account.target) / 100),
+    currentSpent: adjustment.outgoing,
+    receivePurchase,
+    receiveCoolingItem: addCoolingItem,
+  });
   // Changing this key tells React to recreate the panels and clear their local state.
   const [resetKey, setResetKey] = useState(0);
   // useRef keeps the pending timeout ID without causing a render when it changes.

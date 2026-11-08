@@ -19,9 +19,15 @@ export default function useCoolingQueue() {
     setCoolingError('');
   }
 
+  // Used by the demo button and the extension bridge; true once saved.
   function add(item) {
-    try { persist(addCoolingItem(latest.current, item)); }
-    catch { setCoolingError('This checkout could not be saved to the reflection queue.'); }
+    try {
+      persist(addCoolingItem(latest.current, item));
+      return true;
+    } catch {
+      setCoolingError('This checkout could not be saved to the reflection queue. Items from the extension stay queued and retry automatically.');
+      return false;
+    }
   }
 
   function dismiss(itemId) {
@@ -34,19 +40,8 @@ export default function useCoolingQueue() {
     catch { setCoolingError('The reflection queue could not be reset.'); }
   }
 
+  // Keep other open dashboard tabs in step.
   useEffect(() => {
-    const ready = () => window.postMessage({ source: 'credit-guard-dashboard', type: 'ready' }, location.origin);
-    function onMessage(event) {
-      if (event.source !== window || event.origin !== location.origin || event.data?.source !== 'checkout-guard-extension') return;
-      if (event.data.type === 'bridge-ready') { ready(); return; }
-      if (event.data.type !== 'cooling-item') return;
-      try {
-        persist(addCoolingItem(latest.current, event.data.item));
-        window.postMessage({ source: 'credit-guard-dashboard', type: 'cooling-item-saved', id: event.data.item.id }, location.origin);
-      } catch {
-        setCoolingError('A paused checkout remains queued in the extension and will retry when browser storage is available.');
-      }
-    }
     function onStorage(event) {
       if (event.key !== null && event.key !== coolingStorageKey) return;
       try {
@@ -55,13 +50,8 @@ export default function useCoolingQueue() {
         setQueue(next);
       } catch { setCoolingError('The saved reflection queue could not be read.'); }
     }
-    window.addEventListener('message', onMessage);
     window.addEventListener('storage', onStorage);
-    ready();
-    return () => {
-      window.removeEventListener('message', onMessage);
-      window.removeEventListener('storage', onStorage);
-    };
+    return () => window.removeEventListener('storage', onStorage);
   }, []);
 
   return { queue, addCoolingItem: add, dismissCoolingItem: dismiss, resetCoolingQueue: reset, coolingError };

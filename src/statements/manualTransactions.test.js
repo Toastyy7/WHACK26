@@ -13,7 +13,7 @@ test('manual payments work without a PDF, persist and affect the dated balance',
   const saved = appendManualTransaction(null, row);
   assert.equal(saved.result.transactions.length, 1);
   assert.deepEqual(importedTransactions(saved.result.transactions), []);
-  assert.equal(monthlyBalance(28000, saved.result.transactions, '2026-11').balance, 26795);
+  assert.equal(monthlyBalance(28000, saved.result.transactions, '2026-11').balance, 29205);
   let json;
   const storage = { setItem: (_, value) => { json = value; }, getItem: () => json };
   saveStatement(storage, saved);

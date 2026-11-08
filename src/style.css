@@ -106,11 +106,6 @@ h2 {
 .overview strong {
   font-size: 2.15rem;
 }
-.grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(315px, 100%), 1fr));
-  gap: 16px;
-}
 .card,
 .demo {
   background: var(--surface);

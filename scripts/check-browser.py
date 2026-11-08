@@ -4,6 +4,9 @@ pip install -r requirements-browser.txt
 python -m playwright install chromium
 npm run build && npm run test:browser
 
+The last section loads the real extension next to the built dashboard, so it needs
+port 4173 or 3000 free (an allowed dashboard origin in checkout-guard/sync.js).
+
 Set CHROMIUM_PATH to use an existing Chromium executable.
 """
 from functools import partial
@@ -11,7 +14,9 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from threading import Thread
 import os
+import re
 import shutil
+import tempfile
 
 from playwright.sync_api import sync_playwright, expect
 
@@ -78,7 +83,7 @@ errors = []
 
 
 def inject(page):
-    for script in ('core.js', 'content.js'):
+    for script in ('core.js', 'detect.js', 'content.js'):
         page.add_script_tag(path=str(ROOT / 'checkout-guard' / script))
     page.add_style_tag(path=str(ROOT / 'checkout-guard/content.css'))
 
@@ -92,40 +97,33 @@ try:
         context = browser.new_context(viewport={'width': 1440, 'height': 1100})
         context.on('page', lambda page: page.on('pageerror', lambda error: errors.append(str(error))))
         page = context.new_page()
-        page.goto(base + '/dist/')
-        expect(page.get_by_label('Adaptive Mode')).to_be_checked()
+        page.goto(base + '/dist/')  # nested path proves the offline build works from any folder
         amount = page.get_by_label('What would a purchase cost (£)?')
         meter = page.get_by_role('meter')
         overview = page.get_by_role('region', name='Account overview')
-        for purchase, percentage, zone in [('20', '30', 'warning'), ('50', '33', 'warning'), ('220', '50', 'danger'), ('800', '100', 'danger'), ('0', '28', 'safe')]:
+        projection = page.locator('#projection')
+        expect(overview).to_contain_text('£280')
+        expect(meter).to_have_attribute('aria-valuenow', '28')
+        for purchase, percentage, zone in [('20', '30%', 'amber'), ('50', '33%', 'amber'), ('220', '50%', 'red'), ('800', '108%', 'red')]:
             amount.fill(purchase)
-            expect(meter).to_have_attribute('aria-valuenow', percentage)
-            expect(meter).to_have_class('gauge ' + zone)
-            expect(overview).to_contain_text('£280')
-        amount.fill('800')
-        expect(page.locator('#projection')).to_contain_text('Credit limit exceeded')
+            expect(projection).to_contain_text(percentage)
+            expect(projection.locator('.badge')).to_have_class(f'badge zone-{zone}')
+            expect(overview).to_contain_text('£280')  # a preview never changes the account
+        expect(projection).to_contain_text('Credit limit exceeded')
         for invalid in ['-1', '12.345', 'not money']:
             amount.fill(invalid)
-            expect(amount).to_have_attribute('aria-invalid', 'true')
-            expect(meter).to_have_attribute('aria-valuenow', '28')
+            expect(projection).to_contain_text('Enter pounds')
         page.get_by_role('button', name='Clear preview').click()
-        target = page.get_by_role('slider')
-        target.focus()
-        for _ in range(5): target.press('ArrowLeft')
-        expect(target).to_have_value('25')
-        expect(meter).to_have_class('gauge warning')
-        page.get_by_role('button', name='Start weekly plan').click()
-        page.get_by_role('button', name='Run scheduled check').click()
-        expect(overview).to_contain_text('£270')
-        expect(overview).to_contain_text('£15')
-        expect(page.get_by_role('button', name='Run scheduled check')).to_be_disabled()
-        page.get_by_role('button', name='Ask for payment support').click()
-        message = page.get_by_label('Message to the lender')
-        message.fill('Please reply in writing about my payment options.')
-        page.get_by_role('button', name='Cancel', exact=True).click()
-        page.get_by_role('button', name='Ask for payment support').click()
-        expect(message).to_have_value('Please reply in writing about my payment options.')
+        # Saying no to a paused checkout counts as money saved.
+        page.get_by_role('button', name=re.compile("I don't need this")).first.click()
+        expect(page.get_by_text('Total Impulse Money Saved: £69.99')).to_be_visible()
+        page.get_by_role('button', name='☰ Menu').click()
+        page.get_by_role('navigation', name='Main navigation').get_by_role('button', name='Request Grace').click()
+        page.locator('main section.card').get_by_role('button', name='Request Grace').click()
+        page.get_by_label('Message to the lender').fill('Please reply in writing about my payment options.')
         page.get_by_role('button', name='Review message').click()
+        page.get_by_role('button', name='Continue to regulatory disclaimer').click()
+        page.get_by_role('dialog').get_by_role('checkbox').check()
         page.get_by_role('button', name='Confirm and send').click()
         expect(page.get_by_text('Request received · awaiting review')).to_be_visible()
         page.get_by_role('button', name='Reset demo', exact=True).click()
@@ -134,7 +132,7 @@ try:
         page.set_viewport_size({'width': 375, 'height': 900})
         amount.fill('50')
         assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
-        print('PASS dashboard: preview, target slider, payment, support draft/cancel/send, reset, mobile, nested offline path')
+        print('PASS dashboard: preview bands, invalid input, reflection savings, Request Grace send, reset, mobile, nested offline path')
 
         extension = browser.new_context()
         extension.add_init_script(MOCK_STORAGE)
@@ -149,7 +147,7 @@ try:
             inject(checkout)
             expect(checkout.get_by_role('dialog')).to_be_visible()
 
-        for total in ['£1,234.56', '£69.99', '£0.00']:
+        for total in ['£1,234.56', '£0.00', '£69.99']:  # end on a real amount: Continue refuses £0
             boot(total)
             expect(checkout.locator('#cg-order-amount')).to_have_text(total)
         expect(checkout.locator('#cg-proceed')).to_be_enabled(timeout=3000)
@@ -158,7 +156,9 @@ try:
         checkout.wait_for_timeout(500)
         expect(checkout.locator('#checkout-guard-overlay')).to_have_count(0)
         checkout.locator('#order-total').evaluate("el => el.firstChild.data = '£80.00'")
-        expect(checkout.locator('#cg-order-amount')).to_have_text('£80.00')
+        checkout.wait_for_timeout(500)
+        expect(checkout.locator('#checkout-guard-overlay')).to_have_count(0)  # approved shop: no repeat pause
+        boot()
         checkout.locator('#order-total').evaluate("el => el.firstChild.data = '£100.00'")
         expect(checkout.locator('#cg-order-amount')).to_have_text('£100.00')
         checkout.evaluate('window.__setSettings({currentSpent: 250})')
@@ -175,7 +175,7 @@ try:
         checkout.keyboard.press('Escape')
         expect(checkout.get_by_role('dialog')).to_have_count(0)
         expect(checkout.locator('#cardNumber')).to_be_focused()
-        print('PASS checkout: grouped prices, changing totals, saved budget changes, on/off, Continue, focus trap, Escape and focus return')
+        print('PASS checkout: grouped prices, Continue approves the shop, changing totals, saved budget changes, on/off, Continue, focus trap, Escape and focus return')
 
         for total in ['€69.99', '$69.99', 'Calculating…']:
             boot(total)
@@ -236,7 +236,6 @@ try:
         inject(shopify)
         expect(shopify.get_by_role('dialog')).to_be_visible()
         expect(shopify.locator('#cg-order-amount')).to_have_text('£40.00')
-        shopify.locator('#cg-close').click()
         shopify.locator('#checkout-pay-button').evaluate("el => el.textContent = 'Pay now $40.00'")
         expect(shopify.locator('#cg-manual')).to_be_visible()
         print('PASS GamerSupps/Shopify: framed payment fields, one-page payment action, GBP total and foreign-currency fallback')
@@ -287,6 +286,52 @@ try:
         expect(plain.locator('#statusToast')).to_contain_text('not saved')
         assert not errors, errors
         browser.close()
+
+        # Real extension in a real browser: dashboard and CheckoutGuard share one budget.
+        dash_server = None
+        for port in (4173, 3000):
+            try:
+                dash_server = ThreadingHTTPServer(('127.0.0.1', port), partial(QuietHandler, directory=str(ROOT / 'dist')))
+                break
+            except OSError:
+                pass
+        assert dash_server, 'Ports 4173 and 3000 are busy; stop other dev servers and retry.'
+        Thread(target=dash_server.serve_forever, daemon=True).start()
+        extension_dir = str(ROOT / 'checkout-guard')
+        executable = os.environ.get('CHROMIUM_PATH') or shutil.which('chromium')
+        real = p.chromium.launch_persistent_context(
+            tempfile.mkdtemp(), headless=True, executable_path=executable,
+            # Extensions need full Chromium; the default headless shell cannot load them.
+            channel=None if executable else 'chromium',
+            args=['--no-sandbox', f'--disable-extensions-except={extension_dir}', f'--load-extension={extension_dir}'],
+        )
+        real.on('page', lambda page: page.on('pageerror', lambda error: errors.append(str(error))))
+        dash = real.new_page()
+        dash.goto(f'http://127.0.0.1:{dash_server.server_port}/')
+        dash_overview = dash.get_by_role('region', name='Account overview')
+        expect(dash_overview).to_contain_text('£280')
+        shop = real.new_page()
+        shop.goto(base + '/checkout-guard/test-checkout.html')
+        expect(shop.get_by_role('dialog')).to_be_visible(timeout=10000)
+        expect(shop.locator('#cg-current-spent')).to_have_text('£0.00 of £300.00')  # dashboard numbers, not extension defaults
+        expect(shop.locator('#cg-proceed')).to_be_enabled(timeout=20000)  # real 15 s reflection pause
+        shop.locator('#cg-proceed').click()
+        expect(shop.get_by_role('dialog')).to_have_count(0)
+        expect(dash_overview).to_contain_text('£349.99', timeout=10000)  # £280 owed + £69.99 purchase
+        shop.reload()
+        shop.wait_for_timeout(2000)
+        expect(shop.get_by_role('dialog')).to_have_count(0)
+        other = real.new_page()
+        other.goto(base.replace('127.0.0.1', 'localhost') + '/checkout-guard/test-checkout.html')
+        expect(other.get_by_role('dialog')).to_be_visible(timeout=10000)
+        expect(other.locator('#cg-current-spent')).to_have_text('£69.99 of £300.00')
+        other.locator('#cg-step-away').click()
+        expect(dash.get_by_text('Paused from')).to_have_count(2, timeout=10000)  # demo item + this checkout
+        real.close()
+        dash_server.shutdown()
+        dash_server.server_close()
+        assert not errors, errors
+        print('PASS real extension: shared budget, Continue updates both sides, approved shop stays quiet, Leave checkout reaches the reflection queue')
         print('PASS no browser JavaScript errors')
 finally:
     server.shutdown()

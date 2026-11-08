@@ -1,10 +1,9 @@
-name: Check Jamie branch
+name: Check
 
+# Every branch and every pull request; nothing here pushes or deploys.
 on:
   push:
-    branches: [jamieBranch]
   pull_request:
-    branches: [jamieBranch]
   workflow_dispatch:
 
 permissions:
@@ -26,6 +25,13 @@ jobs:
       - run: npm test
       - run: npm run lint:extension
       - run: npm run build
+      - name: Committed dist/ matches the source
+        run: |
+          if [ -n "$(git status --porcelain -- dist)" ]; then
+            git status --short -- dist
+            echo "::error::dist/ is out of date. Run npm run build and commit dist/."
+            exit 1
+          fi
       - run: pip install -r requirements-browser.txt
       - run: python -m playwright install --with-deps chromium
       - run: npm run test:browser

@@ -76,7 +76,7 @@ document.addEventListener('DOMContentLoaded', () => {
       saved = guard.available() ? await guard.load() : { ...guard.defaults };
       apply(saved);
       dirty = false;
-      notice(guard.available() ? 'Settings stay in this browser. Purchases are not recorded automatically.' : 'Preview mode · settings are not saved.');
+      notice(guard.available() ? 'Settings stay in this browser. With the dashboard open, its budget and spending replace these numbers.' : 'Preview mode · settings are not saved.');
       setBusy(false);
     } catch {
       notice('Could not load your saved settings. Retry before making changes.', true);

@@ -68,7 +68,7 @@ export default function DemoControls({
         </label>
       </div>
       <p>
-        Selected statement transactions from the current month are deducted from this starting balance. Amounts save when you leave the field. Starting balance must be £0 or more and
+        Selected transactions from the current month are added to this starting balance, like purchases on a real card. Amounts save when you leave the field. Starting balance must be £0 or more and
         credit limit must be at least £0.01. Use up to two decimal places;
         invalid entries revert to the previous amount.
       </p>
