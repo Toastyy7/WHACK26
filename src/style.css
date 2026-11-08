@@ -409,7 +409,42 @@ td select { min-width: 210px; margin: 0; }
 .empty-cooling { background: var(--soft); border: 1px dashed var(--line); border-radius: 10px; padding: 16px; text-align: center; }
 
 /* Settings menu: one row per setting, label left, switch right; the whole row is clickable. */
-.settings-panel { width: min(320px, calc(100vw - 32px)); padding: 6px; gap: 0; }
+.settings-dialog {
+  width: min(780px, calc(100% - 32px));
+  max-width: none;
+  max-height: calc(100dvh - 32px);
+  margin: auto;
+  padding: 28px;
+  overflow-y: auto;
+  box-shadow: 0 24px 80px rgb(0 0 0 / 25%);
+}
+body:has(.settings-dialog[open]) { overflow: hidden; }
+.settings-heading { display: flex; align-items: start; justify-content: space-between; gap: 16px; }
+.settings-heading h2 { font-size: 1.8rem; }
+.settings-close { min-width: 44px; min-height: 44px; font-size: 1.5rem; line-height: 1; }
+.settings-section { margin-top: 24px; border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
+.settings-section h3 { font-size: 1.05rem; }
+.setting-copy { min-width: 0; }
+.setting-title, .setting-copy small { display: block; }
+.setting-copy small { color: var(--muted); font-size: 0.85rem; font-weight: 400; margin-top: 4px; }
+.advanced-options { border-top: 1px solid var(--line); padding-top: 12px; }
+.settings-select { padding: 0 12px 12px; }
+.settings-select strong, .settings-select small { display: block; }
+.settings-select small { font-weight: 400; font-size: 0.85rem; }
+.settings-select select { margin-top: 10px; }
+.settings-example { margin: 16px 12px 0; padding: 16px; background: var(--soft); border-radius: 10px; }
+.settings-example p { margin: 6px 0 0; }
+.settings-advanced-hint { margin: 12px; font-size: 0.9rem; }
+.settings-footer { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-top: 24px; }
+.settings-footer p { color: var(--muted); font-size: 0.85rem; margin: 0; }
+.settings-footer button { min-width: 90px; min-height: 44px; }
+@media (max-width: 600px) {
+  .settings-dialog { padding: 18px; }
+  .settings-heading h2 { font-size: 1.5rem; }
+  .settings-section { padding: 10px; }
+  .settings-footer { flex-wrap: wrap; }
+  .settings-footer button { width: 100%; }
+}
 .setting {
   display: flex;
   align-items: center;
@@ -461,7 +496,14 @@ td select { min-width: 210px; margin: 0; }
 :root[data-font='dyslexic'] h1,
 :root[data-font='dyslexic'] h2,
 :root[data-font='dyslexic'] .overview strong { letter-spacing: 0; line-height: 1.3; }
-.settings-panel:focus { outline: none; }  /* only focused by clicks inside it; each switch has its own ring */
+/* Accounts: log-in screen and the header's account chip. */
+.auth { display: grid; place-items: center; min-height: 100vh; padding: 24px 16px; }
+.auth-card { width: min(440px, 100%); display: grid; gap: 12px; }
+.auth-card h1 { margin: 0; }
+.auth-card form { display: grid; gap: 8px; }
+.auth-hint { margin: -4px 0 4px; font-size: 0.85rem; color: var(--muted); }
+.auth-switch { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 4px 0 0; }
+.account-chip { align-self: center; font-size: 0.9rem; color: var(--muted); }
 
 .extension-connection { color: var(--muted); font-size: 0.9rem; margin: 12px 0; }
 
@@ -471,3 +513,23 @@ td select { min-width: 210px; margin: 0; }
 .statement-review > p { margin-top: 16px; }
 .statement-review > button { margin: 16px 0; }
 .statement-image { display: block; max-width: 100%; height: auto; margin: 16px 0; }
+
+/* Advanced Mode changes reading comfort, never the account model. */
+:root[data-text-size='large'] { font-size: 18px; }
+:root[data-text-size='extra-large'] { font-size: 20px; }
+:root[data-spacing='comfortable'] { line-height: 1.8; }
+:root[data-spacing='comfortable'] :is(button, select, input:not([type='checkbox'])) { min-height: 52px; }
+:root[data-spacing='comfortable'] .setting { padding-block: 16px; }
+:root[data-spacing='comfortable'] :is(.controls, .actions, .header-actions) { gap: 16px; }
+:root[data-spacing='comfortable'] :is(.card, .demo, .settings-section) { padding: 24px; }
+:root[data-spacing='comfortable'] :is(th, td, .home-transactions li) { padding-block: 20px; }
+:root[data-reduce-motion='true'] *, :root[data-reduce-motion='true'] *::before, :root[data-reduce-motion='true'] *::after {
+  animation: none !important; transition: none !important; scroll-behavior: auto !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+}
+
+.balance-explanation { font-size: 0.9rem; margin: 0; max-width: 42ch; }
+.balance-safe { margin: 4px 0; }
+.balance-headline { overflow-wrap: anywhere; }

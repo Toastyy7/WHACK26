@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useLayoutEffect } from 'react';
 import { createInitialAccount, getGaugeState } from './account.js';
 import AccountOverview from './components/AccountOverview.jsx';
 import SafeZoneGauge from './components/SafeZoneGauge.jsx';
@@ -6,7 +6,8 @@ import ImpulseCoolingQueue from './components/ImpulseCoolingQueue.jsx';
 import RequestGrace from './components/RequestGrace.jsx';
 import DemoControls from './components/DemoControls.jsx';
 import NavigationMenu from './components/NavigationMenu.jsx';
-import SettingsMenu, { loadSetting } from './components/SettingsMenu.jsx';
+import SettingsMenu from './components/SettingsMenu.jsx';
+import { loadDisplayPreferences, saveDisplayPreferences, effectiveDisplayPreferences } from './preferences.js';
 import StatementAnalysis from './components/StatementAnalysis.jsx';
 import HomeSpendingSummary from './components/HomeSpendingSummary.jsx';
 import useSavedStatement from './hooks/useSavedStatement.js';
@@ -17,19 +18,33 @@ import useCoolingQueue from './hooks/useCoolingQueue.js';
 import useExtensionBridge, { resetExtension } from './hooks/useExtensionBridge.js';
 
 // App owns the data shared by the panels below. Props pass that data to each panel.
-export default function App() {
+// `session` comes from AccountGate: the signed-in user (or null for a guest), their own
+// browser storage, and log-in/log-out actions. Without it the app runs as a guest.
+export default function App({ session = {} }) {
   // useState remembers a value between renders; its setter updates the screen.
   // Passing the function here creates the starting account on the first render.
   // Navigation changes the visible screen without discarding account data or drafts.
   const [page, setPage] = useState('home');
   // Like the theme, these display choices are kept across Reset demo.
-  const [view, setView] = useState(() => loadSetting('credit-guard-view', ['simple', 'detailed'], 'simple'));
-  const [font, setFont] = useState(() => loadSetting('credit-guard-font', ['default', 'dyslexic'], 'default'));
-  const { savedStatement, updateSavedStatement, receivePurchase, storageError } = useSavedStatement();
-  const { queue, addCoolingItem, dismissCoolingItem, resetCoolingQueue, coolingError } = useCoolingQueue();
+  const [preferences, setPreferences] = useState(() => {
+    try { return loadDisplayPreferences(localStorage, window.matchMedia('(prefers-color-scheme: dark)').matches); }
+    catch { return loadDisplayPreferences(null); }
+  });
+  const [storageSaved, setStorageSaved] = useState(true);
+  const display = effectiveDisplayPreferences(preferences);
+  const { view, font } = display;
+  useLayoutEffect(() => {
+    for (const [key, value] of Object.entries(effectiveDisplayPreferences(preferences))) document.documentElement.dataset[key] = String(value);
+    try { setStorageSaved(saveDisplayPreferences(localStorage, preferences)); }
+    catch { setStorageSaved(false); }
+  }, [preferences]);
+  const { savedStatement, updateSavedStatement, receivePurchase, storageError } = useSavedStatement(session.storage);
+  const { queue, addCoolingItem, dismissCoolingItem, resetCoolingQueue, coolingError } = useCoolingQueue(session.storage);
   const [statementKey, setStatementKey] = useState(0);
   const heading = useRef(null);
   const [account, setAccount] = useState(createInitialAccount);
+  // The signed-in person's name in titles ("Sam"); guests get "you" wording.
+  const name = session.user ? session.user.username.charAt(0).toUpperCase() + session.user.username.slice(1) : null;
   const month = useCurrentMonth();
   const adjustment = monthlyBalance(account.balance, savedStatement?.result.transactions ?? [], month);
   const displayedAccount = { ...account, balance: adjustment.balance };
@@ -41,6 +56,8 @@ export default function App() {
     receivePurchase,
     receiveCoolingItem: addCoolingItem,
     font,
+    displayPreferences: display,
+    cardLimit: account.limit,
   });
   // Changing this key tells React to recreate the panels and clear their local state.
   const [resetKey, setResetKey] = useState(0);
@@ -88,14 +105,21 @@ export default function App() {
         <span className="brand">◈ &nbsp; Adaptive Credit Guard</span>
         <div className="header-actions" key={resetKey}>
           <NavigationMenu page={page} onNavigate={navigate} />
-          <SettingsMenu view={view} onView={setView} font={font} onFont={setFont} />
+          <SettingsMenu preferences={preferences} onChange={setPreferences} storageSaved={storageSaved} />
           <button className="secondary" onClick={reset}>Reset demo</button>
+          {session.user ? (<>
+            <span className="account-chip">Signed in as <strong>{session.user.username}</strong></span>
+            <button className="secondary" onClick={session.onLogOut}>Log out</button>
+          </>) : session.onLogIn && (<>
+            <span className="account-chip">{session.offline ? 'Guest (accounts offline)' : 'Guest'}</span>
+            {!session.offline && <button className="secondary" onClick={session.onLogIn}>Log in</button>}
+          </>)}
         </div>
       </header>
       <div className="intro">
         <p className="eyebrow">CAPITAL ONE HACKATHON · SIMULATED ACCOUNT</p>
         <h1 ref={heading} tabIndex={-1}>
-          {{ home: 'Emil’s credit card', grace: 'Request Grace', statements: 'Statement analysis' }[page]}
+          {{ home: name ? `${name}’s credit card` : 'Your credit card', grace: 'Request Grace', statements: 'Statement analysis' }[page]}
         </h1>
         <p>{{ home: 'See what you owe and what you can do next.', grace: 'Send a written request and follow its progress.', statements: 'See where your money goes.' }[page]}</p>
       </div>
@@ -109,13 +133,14 @@ export default function App() {
       <div key={resetKey}>
         {/* Keep screens mounted so navigating home preserves the request and preview. */}
         <div hidden={page !== 'home'}>
-          <AccountOverview account={displayedAccount} detailed={view === 'detailed'} monthlyOutgoing={adjustment.outgoing} />
-          <SafeZoneGauge account={displayedAccount} />
+          <AccountOverview account={displayedAccount} detailed={view === 'detailed'} monthlyOutgoing={adjustment.outgoing} balanceFigure={display.balanceFigure} />
+          <SafeZoneGauge account={displayedAccount} balanceFigure={display.balanceFigure} />
           <ImpulseCoolingQueue
             items={queue.items}
             savings={queue.savings}
             onDismiss={dismissCoolingItem}
             onAddSimulated={addCoolingItem}
+            name={name}
           />
           {savedStatement && <HomeSpendingSummary
             key={`${savedStatement.fileName}-${savedStatement.savedAt}`}

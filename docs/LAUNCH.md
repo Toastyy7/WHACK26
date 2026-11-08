@@ -6,6 +6,7 @@ Three ways to run it, from quickest to most complete. Everything runs locally: n
 |---|---|---|
 | Show the dashboard with no setup | [Offline demo](#1-offline-demo-no-node) | Python 3 |
 | Work on the code | [Dev server](#2-dev-server) | Node 20.19+ or 22.12+ |
+| Accounts (register / log in / log out) | [Accounts server](#2b-accounts-server) | Node (nothing extra) |
 | Show dashboard + extension together | [Dev server](#2-dev-server) + [extension](#3-load-the-checkoutguard-extension) | Chrome/Chromium or Firefox 142+ |
 
 ---
@@ -42,6 +43,23 @@ To refresh the offline demo after changing code:
 npm run build   # rewrites dist/ – commit it, CI checks it is up to date
 ```
 
+## 2b. Accounts server
+
+Accounts need the small Node server in `server/` (no extra packages). It serves the built app **and** the accounts API on port 4173.
+
+```sh
+npm run build      # the server serves dist/
+npm run server     # http://127.0.0.1:4173 – log in / create an account
+```
+
+Working on the UI with accounts: run `npm run server` in one terminal and `npm run dev` in another. The dev server on 5173 forwards `/api` to 4173.
+
+Two-device demo: `npm run server -- --lan`, then open `http://<this-laptop's-IP>:4173` on the other device (plain HTTP, demo only).
+
+- **No server running?** The app goes straight into **guest mode** (header: "Guest (accounts offline)") and works exactly as before. The Python offline demo always runs as guest.
+- Each account's money data stays **in this browser**, separate per account. Guests use the original storage, so older demo data appears there.
+- Accounts are saved in `server/data/users.json` (gitignored). Delete it to remove all accounts.
+
 ## 3. Load the CheckoutGuard extension
 
 The extension is the `checkout-guard/` folder. It needs no build step.
@@ -69,6 +87,20 @@ It's removed when Firefox closes, so load it again next time.
 3. The **Take a breath before you buy** popup appears with the dashboard's number: **Safe to spend now: £20.00** (fresh demo: you owe £280.00 of a £300.00 safe limit).
 4. Wait for the timer, click **Continue to checkout**. The dashboard and both extension popups now say **Safe to spend £0.00** and "You owe £349.99 of your £300.00 safe limit". The popup stays away on that shop for 30 minutes.
 5. Or click **Leave checkout** instead. The item appears in the dashboard's 30-minute reflection queue.
+
+### Personalise the website and extension together
+
+Open **⚙ Settings** → **Main balance number** to choose Safe to spend, Card limit remaining or What you owe. In a fresh demo these are **£20.00**, **£720.00** and **£280.00**. The selection also applies to the extension toolbar and checkout’s before/after figures, saves automatically and survives Reset demo. It works with Advanced Mode off too. The safe-limit gauge and warnings stay visible whichever number you choose. If the extension says the full limit is unavailable, open the website in the same browser profile to sync it.
+
+Open **⚙ Settings** on the website. The large centred dialog has the existing theme, font and Detailed view switches. Enable **Advanced Mode** for:
+
+- **Text size:** Standard, Larger or Largest.
+- **Comfortable spacing:** more room around lines and controls.
+- **Reduce motion:** no decorative animations or transitions. Device reduced-motion settings always apply.
+
+Changes save automatically, survive refresh and **Reset demo**, and apply to the toolbar popup and checkout overlay in this browser profile. Turn Advanced Mode off to pause its effects; turn it back on to restore your choices. Escape, Done and × close the dialog. Tab stays inside until you close it.
+
+Keep a dashboard tab open on an allowed port when changing settings. Then open the extension toolbar or the fake checkout in another tab to compare. Already-open extension popups update automatically; the shop page itself is unchanged. Reload the extension and refresh all tabs after updating the code. If storage is blocked, the website explains that choices may last only for this visit.
 
 ## 4. Run the checks
 
@@ -104,7 +136,10 @@ Package the extension as a ZIP (for sharing or Firefox signing): `npm run pack:e
 | `npm ci` errors about the lockfile | You're on an old branch. Pull, then run `npm ci` again. |
 | Blank page | You opened a `file://` URL. Use one of the servers above. |
 | Want a clean demo | Click **Reset demo** in the dashboard header. |
-| Dyslexia-friendly font, dark mode or detailed view | **⚙ Settings** in the dashboard header. The font also switches the extension's popups (refresh the shop tab if it was already open). |
+| Stuck on "Log in" / "Accounts aren't available" | The accounts server isn't running. Start `npm run server`, or click **Continue without an account**. |
+| "Too many attempts" | 5 wrong passwords for that username: wait 15 minutes or restart the server. |
+| Forgot a demo password | Stop the server, delete `server/data/users.json` (removes **all** accounts), start it again. |
+| Font, theme, detailed view, text size, spacing or motion | **⚙ Settings** in the dashboard header. Advanced Mode reveals extra choices. All effective choices also apply to both extension popups. Reload the extension and refresh tabs after a code update. |
 
 ### If a checkout still does not appear
 

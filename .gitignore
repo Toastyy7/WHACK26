@@ -19,6 +19,9 @@ playwright-report/
 # Personal editor settings
 .vscode/
 
+# Accounts server data (usernames, password hashes, sessions) – never commit
+server/data/
+
 # Generated from locked npm packages before dev/build; copied into committed dist/.
 /public/ocr/
 

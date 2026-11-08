@@ -11,14 +11,14 @@
   // shortcut: read once per page load, so an approval expiring while the page stays open is ignored.
   let approved = false;
   let active = null;
-  // Follows the dashboard's Settings → Dyslexia-friendly font.
-  let font = 'default';
+  // Display choices affect only our overlay, never the shopping page.
+  let display = guard.displayPreferences();
   let fontFaceAdded = false;
   // Fonts load from the extension. A shop's strict font policy can block them; the popup then
   // keeps the normal font, which is the safe fallback.
-  function useFont(next) {
-    font = next;
-    if (font === 'dyslexic' && !fontFaceAdded) {
+  function useDisplay(next) {
+    display = next;
+    if (display.font === 'dyslexic' && !fontFaceAdded) {
       fontFaceAdded = true;
       const style = document.createElement('style');
       style.id = 'checkout-guard-font';
@@ -26,7 +26,7 @@
         `@font-face{font-family:'OpenDyslexic';font-weight:${weight};font-display:swap;src:url("${guard.fileUrl(`fonts/opendyslexic-${weight}.woff2`)}") format("woff2")}`).join('');
       document.head.appendChild(style);
     }
-    if (active) active.overlay.dataset.font = font;
+    if (active) guard.applyDisplayPreferences(active.overlay, display);
   }
   let refreshTimer = null;
   let loadVersion = 0;
@@ -39,25 +39,28 @@
     const previousFocus = document.activeElement;
     const overlay = document.createElement('div');
     overlay.id = 'checkout-guard-overlay';
-    overlay.dataset.font = font;
+    guard.applyDisplayPreferences(overlay, display);
     overlay.innerHTML = `
       <section id="checkout-guard-modal" role="dialog" aria-modal="true" aria-labelledby="cg-modal-title" aria-describedby="cg-description" tabindex="-1">
         <button type="button" id="cg-close" aria-label="Close preview">×</button>
         <div class="cg-badge">🛡️ CheckoutGuard</div>
         <h2 id="cg-modal-title" class="cg-title">Take a breath before you buy</h2>
         <p id="cg-description" class="cg-subtitle">Here is what this order would leave you. Continuing adds it to what you owe on the dashboard (as planned, not a confirmed payment).</p>
+        <p id="cg-balance-explanation" class="cg-detail"></p>
         <div class="cg-impact-card">
-          <div class="cg-impact-row"><span>Safe to spend now:</span><strong id="cg-left-now"></strong></div>
+          <div class="cg-impact-row"><span id="cg-main-label">Safe to spend now:</span><strong id="cg-left-now"></strong></div>
           <div class="cg-impact-row"><span id="cg-order-label">This order:</span><strong id="cg-order-amount"></strong></div>
           <div id="cg-manual" hidden>
             <label for="cg-purchase-input">Purchase amount (£)</label>
             <input id="cg-purchase-input" inputmode="decimal" autocomplete="off" aria-describedby="cg-amount-note">
             <p id="cg-amount-note">We couldn't read a GBP order total. Enter it above to preview; other currencies need conversion to pounds.</p>
           </div>
-          <div class="cg-impact-row"><span>After it:</span><strong id="cg-remaining"></strong></div>
+          <div class="cg-impact-row"><span id="cg-after-label">After it:</span><strong id="cg-remaining"></strong></div>
           <div class="cg-gauge-bar" role="meter" aria-label="Safe limit used after this order" aria-valuemin="0" aria-valuemax="100"><div class="cg-gauge-fill"></div></div>
           <p id="cg-budget-status" role="status"></p>
           <p id="cg-current-spent" class="cg-detail"></p>
+          <p id="cg-extra-detail" class="cg-detail" hidden></p>
+          <p id="cg-safe-context" class="cg-detail" hidden></p>
         </div>
         <div class="cg-timer-box"><span id="cg-timer-label">Reflection pause:</span><span id="cg-timer-seconds" class="cg-timer-seconds" role="timer" aria-live="off"></span></div>
         <div id="cg-timer-status" role="status" class="cg-visually-hidden"></div>
@@ -80,13 +83,24 @@
     find('#cg-manual').hidden = total !== null;
 
     function render() {
-      const renderKey = JSON.stringify([settings.monthlyBudget, settings.currentSpent, manualAmount, amountInput.value]);
+      const renderKey = JSON.stringify([settings.monthlyBudget, settings.currentSpent, manualAmount, amountInput.value, display.view, display.balanceFigure, settings.cardLimit]);
       if (renderKey === lastRender) return;
       lastRender = renderKey;
       const purchase = total ?? manualAmount;
+      find('#cg-extra-detail').hidden = display.view !== 'detailed' || purchase === null;
       find('#cg-order-label').textContent = total === null ? 'Entered amount:' : 'This order:';
       find('#cg-order-amount').textContent = purchase === null ? 'Not available' : guard.money(purchase);
-      find('#cg-left-now').textContent = guard.money(guard.impact(settings, 0).remaining);
+      const values = { safeLimit: guard.pence(settings.monthlyBudget), owed: guard.pence(settings.currentSpent), cardLimit: settings.cardLimit };
+      const current = guard.getBalanceFigure(display.balanceFigure, values);
+      const alternate = display.balanceFigure !== 'safe-to-spend';
+      find('#cg-main-label').textContent = `${current.label} now:`;
+      find('#cg-after-label').textContent = alternate ? `${current.label} after this order:` : 'After it:';
+      find('#cg-left-now').textContent = current.amount === null ? 'Not available' : guard.money(current.amount);
+      find('#cg-balance-explanation').textContent = current.amount === null ? 'Open the dashboard to sync your full card limit.' : current.description;
+      find('#cg-safe-context').hidden = !alternate;
+      const safeNow = `Safe to spend now: ${guard.money(guard.impact(settings, 0).remaining)}.`;
+      find('#cg-safe-context').textContent = safeNow;
+
       // Same sentence as the dashboard's overview card.
       find('#cg-current-spent').textContent = `You owe ${guard.money(guard.pence(settings.currentSpent))} of your ${guard.money(guard.pence(settings.monthlyBudget))} safe limit.`;
       const meter = find('.cg-gauge-bar');
@@ -102,8 +116,12 @@
           : 'Enter a GBP total to see its impact.';
       } else {
         const result = guard.impact(settings, purchase);
+        find('#cg-extra-detail').textContent = `${Math.round(result.percentage)}% of your safe limit used after this order.`;
         const over = result.projected - guard.pence(settings.monthlyBudget);
-        find('#cg-remaining').textContent = over > 0 ? `${guard.money(over)} over your safe limit` : `${guard.money(result.remaining)} safe to spend`;
+        const safeAfter = over > 0 ? `${guard.money(over)} over your safe limit` : `${guard.money(result.remaining)} safe to spend`;
+        const after = guard.getBalanceFigure(display.balanceFigure, { ...values, owed: result.projected });
+        find('#cg-remaining').textContent = alternate ? after.amount === null ? 'Not available' : guard.money(after.amount) : safeAfter;
+        find('#cg-safe-context').textContent = `${safeNow} After this order: ${safeAfter}.`;
         fill.className = `cg-gauge-fill ${result.zone}`;
         fill.style.width = `${result.width}%`;
         meter.setAttribute('aria-valuenow', String(Math.round(result.width)));
@@ -267,10 +285,10 @@
   async function loadSettings() {
     const version = ++loadVersion;
     try {
-      const [loaded, shopApproved, savedFont] = await Promise.all([guard.load(), guard.isApproved(location.hostname), guard.getFont()]);
+      const [loaded, shopApproved, savedDisplay] = await Promise.all([guard.load(), guard.isApproved(location.hostname), guard.getDisplayPreferences()]);
       if (version !== loadVersion) return;
       settings = loaded;
-      useFont(savedFont);
+      useDisplay(savedDisplay);
       approved = approved || shopApproved;
       refresh();
     } catch (error) {
@@ -320,6 +338,6 @@
   });
   window.addEventListener('pageshow', scheduleRefresh);
   guard.subscribe(loadSettings);
-  guard.subscribeFont(loadSettings);
+  guard.subscribeDisplayPreferences(loadSettings);
   loadSettings();
 })();

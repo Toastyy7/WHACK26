@@ -9,6 +9,7 @@
   "scripts": {
     "start": "vite --host 127.0.0.1 --port 5173 --strictPort",
     "dev": "vite --host 127.0.0.1 --port 5173 --strictPort",
+    "server": "node server/index.js",
     "build": "vite build",
     "test": "node --test",
     "test:browser": "python3 scripts/check-browser.py",

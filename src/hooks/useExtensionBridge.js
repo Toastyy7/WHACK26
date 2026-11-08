@@ -9,11 +9,11 @@ export const resetExtension = () => post({ type: 'reset' });
 // Messages never leave this window: both sides check the source window and origin.
 // Extension → dashboard: purchases and paused checkouts, acknowledged only once saved.
 // Dashboard → extension: a snapshot (integer pence) so both show the same budget and spend,
-// and display preferences (the OpenDyslexic font) so the popups match the dashboard.
-export default function useExtensionBridge({ monthlyBudget, currentSpent, receivePurchase, receiveCoolingItem, font = 'default' }) {
-  const snapshot = { type: 'snapshot', monthlyBudget, currentSpent: Math.max(0, currentSpent) };
+// and display preferences so the toolbar and checkout popups match the dashboard.
+export default function useExtensionBridge({ monthlyBudget, currentSpent, receivePurchase, receiveCoolingItem, font = 'default', displayPreferences, cardLimit }) {
+  const snapshot = { type: 'snapshot', monthlyBudget, currentSpent: Math.max(0, currentSpent), cardLimit };
   const latest = useRef();
-  const preferences = { type: 'preferences', font };
+  const preferences = { type: 'preferences', font, display: displayPreferences };
   const [connection, setConnection] = useState('connecting');
   const lastConfirmed = useRef(Date.now());
   latest.current = { receivePurchase, receiveCoolingItem, snapshot, preferences };
@@ -63,7 +63,7 @@ export default function useExtensionBridge({ monthlyBudget, currentSpent, receiv
   useEffect(() => {
     setConnection('connecting');
     post(snapshot);
-  }, [snapshot.monthlyBudget, snapshot.currentSpent]);
-  useEffect(() => post(preferences), [font]);
+  }, [snapshot.monthlyBudget, snapshot.currentSpent, snapshot.cardLimit]);
+  useEffect(() => post(preferences), [font, displayPreferences?.theme, displayPreferences?.view, displayPreferences?.advancedMode, displayPreferences?.textSize, displayPreferences?.spacing, displayPreferences?.reduceMotion, displayPreferences?.balanceFigure]);
   return connection;
 }

@@ -16,7 +16,11 @@ from threading import Thread
 import os
 import re
 import shutil
+import socket
+import subprocess
 import tempfile
+import time
+import urllib.request
 
 from playwright.sync_api import sync_playwright, expect
 
@@ -109,8 +113,25 @@ try:
         expect(overview).not_to_contain_text('%')  # simple view: no percentages
         settings = page.get_by_role('button', name='⚙ Settings')
         settings.click()
+        headline_choice = page.get_by_label('Main balance number')
+        for value, label, expected in [('card-remaining', 'Card limit remaining', '£720.00'), ('owed', 'What you owe', '£280.00')]:
+            headline_choice.select_option(value)
+            expect(overview.locator('.balance-headline')).to_contain_text(label + expected)
+            expect(overview.locator('.balance-safe')).to_contain_text('Safe to spend: £20.00')
+            expect(meter).to_have_attribute('aria-valuenow', '93')
+            page.keyboard.press('Escape')
+            amount.fill('50')
+            expect(projection).to_contain_text(label + ' after this: ' + ('£670.00' if value == 'card-remaining' else '£330.00'))
+            expect(projection).to_contain_text('£30.00 over your safe limit')
+            settings.click()
+        page.reload()
+        settings.click()
+        expect(headline_choice).to_have_value('owed')
+        headline_choice.select_option('safe-to-spend')
+        expect(overview.locator('.balance-safe')).to_have_count(0)
+        print('PASS main balance choice: card remaining £720.00, owed £280.00, default safe £20.00, unchanged gauge and reload persistence')
         view = page.get_by_role('switch', name='Detailed view')
-        page.locator('.setting span', has_text='Detailed view').click()  # clicking the words alone must toggle
+        page.locator('.setting-title', has_text='Detailed view').click()  # clicking the words alone must toggle
         expect(view).to_be_checked()
         expect(page.locator('#settings-panel')).to_be_visible()  # and the menu stays open
         expect(overview).to_contain_text('Card limit used28%')
@@ -132,6 +153,50 @@ try:
         page.get_by_role('switch', name='Dyslexia-friendly font (OpenDyslexic)').uncheck()
         page.keyboard.press('Escape')
         expect(page.locator('html')).to_have_attribute('data-font', 'default')
+        # Native centred dialog: advanced controls, persistence, keyboard and mobile.
+        settings.click()
+        panel = page.locator('#settings-panel')
+        box = panel.bounding_box()
+        assert box['width'] > 650 and abs(box['x'] + box['width'] / 2 - 720) < 2
+        page.get_by_role('switch', name='Advanced Mode').check()
+        page.get_by_label('Text size', exact=False).select_option('extra-large')
+        page.get_by_role('switch', name='Comfortable spacing').check()
+        page.get_by_role('switch', name='Reduce motion', exact=True).check()
+        page.get_by_role('switch', name='Dark mode').check()
+        expect(page.locator('html')).to_have_attribute('data-text-size', 'extra-large')
+        assert page.evaluate("getComputedStyle(document.documentElement).fontSize") == '20px'
+        assert page.locator('#setting-theme').evaluate("el => getComputedStyle(el).transitionDuration") == '0s'
+        page.get_by_role('button', name='Done', exact=True).focus()
+        page.keyboard.press('Tab')
+        assert panel.evaluate('el => el.contains(document.activeElement)')
+        page.keyboard.press('Escape')
+        expect(settings).to_be_focused()
+        page.reload()
+        expect(page.locator('html')).to_have_attribute('data-text-size', 'extra-large')
+        page.get_by_role('button', name='Reset demo', exact=True).click()
+        expect(page.locator('html')).to_have_attribute('data-spacing', 'comfortable')
+        expect(page.locator('html')).to_have_attribute('data-theme', 'dark')
+        page.set_viewport_size({'width': 375, 'height': 850})
+        settings.click()
+        page.get_by_role('switch', name='Dyslexia-friendly font (OpenDyslexic)').check()
+        assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
+        assert panel.evaluate('el => el.scrollWidth <= el.clientWidth')
+        page.get_by_role('switch', name='Advanced Mode').uncheck()
+        expect(page.locator('html')).to_have_attribute('data-text-size', 'normal')
+        page.get_by_role('switch', name='Advanced Mode').check()
+        expect(page.get_by_label('Text size', exact=False)).to_have_value('extra-large')
+        # Restore baseline preferences for the existing account flow tests.
+        page.get_by_role('switch', name='Advanced Mode').uncheck()
+        page.get_by_role('switch', name='Dark mode').uncheck()
+        page.get_by_role('switch', name='Dyslexia-friendly font (OpenDyslexic)').uncheck()
+        page.get_by_role('button', name='Done', exact=True).click()
+        page.set_viewport_size({'width': 1440, 'height': 1100})
+        page.emulate_media(reduced_motion='reduce')
+        settings.click()
+        assert page.locator('#setting-theme').evaluate("el => getComputedStyle(el).transitionDuration") == '0s'
+        page.keyboard.press('Escape')
+        page.emulate_media(reduced_motion='no-preference')
+        print('PASS advanced settings: centred dialog, focus trap/return, text size, spacing, reduced motion, dark mode, reload/reset persistence, retained choices and mobile with OpenDyslexic')
         for purchase, words, zone in [('10', '£10.00 safe to spend', 'amber'), ('20', '£0.00 safe to spend', 'amber'),
                                       ('50', '£30.00 over your safe limit', 'red'), ('800', '£780.00 over your safe limit', 'red')]:
             amount.fill(purchase)
@@ -179,6 +244,26 @@ try:
         for total in ['£1,234.56', '£0.00', '£69.99']:  # end on a real amount: Continue refuses £0
             boot(total)
             expect(checkout.locator('#cg-order-amount')).to_have_text(total)
+        display = dict(theme='dark', font='dyslexic', view='detailed', advancedMode=True, textSize='extra-large', spacing='comfortable', reduceMotion=True)
+        original_shop_background = checkout.evaluate('getComputedStyle(document.body).backgroundColor')
+        checkout.evaluate("display => window.__setSettings({'checkoutGuard.preferences': display, 'checkoutGuard.font': display.font})", display)
+        expect(checkout.locator('#checkout-guard-overlay')).to_have_attribute('data-theme', 'dark')
+        expect(checkout.locator('#checkout-guard-overlay')).to_have_attribute('data-text-size', 'extra-large')
+        expect(checkout.locator('#cg-extra-detail')).to_be_visible()
+        assert checkout.locator('.cg-title').evaluate('el => getComputedStyle(el).fontSize') == '30px'
+        assert checkout.locator('#checkout-guard-modal').evaluate('el => getComputedStyle(el).animationName') == 'none'
+        assert checkout.locator('.cg-gauge-fill').evaluate('el => getComputedStyle(el).transitionDuration') == '0s'
+        assert checkout.evaluate('getComputedStyle(document.body).backgroundColor') == original_shop_background
+        checkout.evaluate("display => window.__setSettings({'checkoutGuard.preferences': {...display, balanceFigure:'card-remaining'}, 'checkoutGuard.cardLimit': 100000})", display)
+        expect(checkout.locator('#cg-main-label')).to_have_text('Card limit remaining now:')
+        expect(checkout.locator('#cg-left-now')).to_have_text('£880.00')
+        expect(checkout.locator('#cg-remaining')).to_have_text('£810.01')
+        expect(checkout.locator('#cg-safe-context')).to_contain_text('Safe to spend now: £180.00')
+        checkout.evaluate("display => window.__setSettings({'checkoutGuard.preferences': {...display, balanceFigure:'owed'}})", display)
+        expect(checkout.locator('#cg-left-now')).to_have_text('£120.00')
+        expect(checkout.locator('#cg-remaining')).to_have_text('£189.99')
+        checkout.evaluate("display => window.__setSettings({'checkoutGuard.preferences': display})", display)
+        print('PASS overlay preferences: live updates, larger text, spacing, dark theme, reduced motion, detailed view, host page unaffected')
         expect(checkout.locator('#cg-proceed')).to_be_enabled(timeout=3000)
         checkout.locator('#cg-proceed').click()
         checkout.locator('#name').evaluate("el => el.insertAdjacentHTML('afterend', '<p>Address checked</p>')")
@@ -273,6 +358,18 @@ try:
         popup = extension.new_page()
         popup.goto(base + '/checkout-guard/popup.html')
         expect(popup.locator('#saveBtn')).to_be_enabled()
+        popup.evaluate("display => window.__setSettings({'checkoutGuard.preferences': display, 'checkoutGuard.font': display.font})", display)
+        expect(popup.locator('html')).to_have_attribute('data-text-size', 'extra-large')
+        assert popup.locator('h1').evaluate('el => getComputedStyle(el).fontSize') == '23.75px'
+        assert popup.locator('button').first.evaluate('el => getComputedStyle(el).minHeight') == '52px'
+        expect(popup.locator('#extraDetail')).to_be_visible()
+        popup.evaluate("display => window.__setSettings({'checkoutGuard.preferences': {...display, balanceFigure:'card-remaining'}, 'checkoutGuard.cardLimit': 100000})", display)
+        expect(popup.locator('#balanceLabel')).to_have_text('Card limit remaining')
+        expect(popup.locator('#safeSummary')).to_be_visible()
+        popup.evaluate("window.__setSettings({'checkoutGuard.cardLimit': null})")
+        expect(popup.locator('#remainingAmount')).to_have_text('Not available')
+        expect(popup.locator('#balanceExplanation')).to_contain_text('Open the dashboard')
+        popup.evaluate("display => window.__setSettings({'checkoutGuard.preferences': display})", display)
         spent = popup.get_by_label('You owe (£)')
         budget = popup.get_by_label('Safe limit (£)')
         for spend, detail, remaining, zone in [('120', 'You owe £120.00 of your £300.00 safe limit.', '£180.00', 'safe'),
@@ -401,11 +498,110 @@ try:
         expect(shop.locator('#checkout-guard-overlay')).to_have_attribute('data-font', 'dyslexic', timeout=5000)
         assert 'OpenDyslexic' in shop.evaluate("getComputedStyle(document.querySelector('#cg-budget-status')).fontFamily")
         shop.wait_for_function("document.fonts.check('16px OpenDyslexic')", timeout=5000)  # really loaded from the extension
+        dash.get_by_label('Main balance number').select_option('card-remaining')
+        expect(toolbar.locator('#balanceLabel')).to_have_text('Card limit remaining')
+        expect(toolbar.locator('#remainingAmount')).to_have_text('£720.00')
+        expect(shop.locator('#cg-left-now')).to_have_text('£720.00')
+        expect(shop.locator('#cg-remaining')).to_have_text('£650.01')
+        expect(toolbar.locator('#safeSummary')).to_contain_text('£20.00')
+        dash.get_by_label('Main balance number').select_option('owed')
+        expect(toolbar.locator('#remainingAmount')).to_have_text('£280.00')
+        expect(shop.locator('#cg-remaining')).to_have_text('£349.99')
+        dash.get_by_label('Main balance number').select_option('safe-to-spend')
+        dash.get_by_role('switch', name='Advanced Mode').check()
+        dash.get_by_label('Text size', exact=False).select_option('extra-large')
+        dash.get_by_role('switch', name='Comfortable spacing').check()
+        dash.get_by_role('switch', name='Reduce motion', exact=True).check()
+        dash.get_by_role('switch', name='Dark mode').check()
+        for target in (toolbar.locator('html'), shop.locator('#checkout-guard-overlay')):
+            for key, value in [('theme', 'dark'), ('text-size', 'extra-large'), ('spacing', 'comfortable'), ('reduce-motion', 'true')]:
+                expect(target).to_have_attribute('data-' + key, value, timeout=5000)
+        assert shop.locator('.cg-title').evaluate('el => getComputedStyle(el).fontSize') == '30px'
+        assert toolbar.locator('h1').evaluate('el => getComputedStyle(el).fontSize') == '23.75px'
+        dash.keyboard.press('Escape')
+        dash.get_by_role('button', name='Reset demo', exact=True).click()
+        toolbar.reload()
+        expect(toolbar.locator('html')).to_have_attribute('data-text-size', 'extra-large')
+        expect(toolbar.locator('#remainingAmount')).to_have_text('£20.00')
+        print('PASS real preference bridge: all accessibility choices reach both popups live and survive reset/reopen')
         real.close()
         dash_server.shutdown()
         dash_server.server_close()
         assert not errors, errors
         print('PASS real extension: shared budget, Continue updates both sides, approved shop stays quiet, Reset demo re-arms it, popup Reset keeps dashboard numbers, font reaches both popups, Leave checkout reaches the reflection queue')
+
+        # Accounts: the real Node server (npm run server) with a throwaway accounts file.
+        with socket.socket() as probe:
+            probe.bind(('127.0.0.1', 0))
+            accounts_port = probe.getsockname()[1]
+        accounts_dir = tempfile.mkdtemp()
+        accounts = subprocess.Popen(['node', str(ROOT / 'server' / 'index.js')], cwd=ROOT,
+                                    env={**os.environ, 'PORT': str(accounts_port), 'ACCOUNTS_FILE': os.path.join(accounts_dir, 'users.json')},
+                                    stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+        try:
+            accounts_url = f'http://127.0.0.1:{accounts_port}'
+            for _ in range(50):
+                try:
+                    urllib.request.urlopen(accounts_url + '/api/health', timeout=1)
+                    break
+                except OSError:
+                    time.sleep(0.1)
+            web = p.chromium.launch(executable_path=os.environ.get('CHROMIUM_PATH') or shutil.which('chromium'), headless=True, args=['--no-sandbox'])
+            site = web.new_page()
+            site.on('pageerror', lambda error: errors.append(str(error)))
+            site.goto(accounts_url + '/')
+            expect(site.get_by_role('heading', name='Log in')).to_be_visible()
+
+            def create(name, password):
+                site.get_by_role('button', name='Create an account').click()
+                site.get_by_label('Username').fill(name)
+                site.get_by_label('Password', exact=True).fill(password)
+                site.get_by_role('button', name='Create account').click()
+                expect(site.get_by_text(f'Signed in as {name}')).to_be_visible()
+
+            def log_out():
+                site.get_by_role('button', name='Log out').click()
+                expect(site.get_by_role('heading', name='Log in')).to_be_visible()
+
+            saved = site.get_by_text('Total Impulse Money Saved: £69.99')
+            create('alice', 'alice password')
+            expect(site.get_by_role('heading', level=1)).to_have_text('Alice’s credit card')
+            site.get_by_role('button', name=re.compile("I don't need this")).first.click()
+            expect(saved).to_be_visible()
+            # alice imports a statement; it must stay hers.
+            statement = site.get_by_role('heading', name='Your statement spending')
+            site.get_by_role('button', name='☰ Menu').click()
+            site.get_by_role('navigation', name='Main navigation').get_by_role('button', name='Statement analysis').click()
+            site.get_by_role('button', name=re.compile('Load sample statement')).click()
+            site.locator('.statement-review').get_by_role('checkbox').last.check()
+            site.get_by_role('button', name='Confirm and import selected').click()
+            site.get_by_role('button', name='☰ Menu').click()
+            site.get_by_role('navigation', name='Main navigation').get_by_role('button', name='Home').click()
+            expect(statement).to_be_visible()
+            log_out()
+            create('bob', 'bob password')
+            expect(saved).to_have_count(0)  # bob doesn't see alice's data
+            expect(statement).to_have_count(0)  # ...or her statement
+            log_out()
+            site.get_by_label('Username').fill('alice')
+            site.get_by_label('Password', exact=True).fill('wrong password')
+            site.get_by_role('button', name='Log in', exact=True).click()
+            expect(site.get_by_role('alert')).to_have_text('Username or password is wrong.')
+            site.get_by_label('Password', exact=True).fill('alice password')
+            site.get_by_role('button', name='Log in', exact=True).click()
+            expect(saved).to_be_visible()  # alice's data is back
+            expect(statement).to_be_visible()
+            site.reload()
+            expect(site.get_by_text('Signed in as alice')).to_be_visible()  # session survives a reload
+            log_out()
+            site.get_by_role('button', name='Continue without an account').click()
+            expect(site.get_by_text('Guest', exact=True)).to_be_visible()
+            expect(site.get_by_role('heading', level=1)).to_have_text('Your credit card')
+            web.close()
+            print('PASS accounts: register, separate data and statements per account, wrong password, log in again, session survives reload, log out, guest')
+        finally:
+            accounts.terminate()
+            accounts.wait(timeout=10)
         print('PASS no browser JavaScript errors')
 finally:
     server.shutdown()

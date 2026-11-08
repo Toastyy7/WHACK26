@@ -96,7 +96,7 @@ Then **say the plan back** in a short list (files you'll touch, what changes, ho
 - ❌ Never delete branches, rewrite history, or remove files you didn't create without asking.
 
 ### Never commit these
-`node_modules/` · `.next/` · `.vite/` · `.venv/` · `.vscode/` · `web-ext-artifacts/` · `test-results/` · `.env*` · secrets/tokens of any kind. They're in `.gitignore`. Don't force-add them.
+`node_modules/` · `.next/` · `.vite/` · `.venv/` · `.vscode/` · `server/data/` (real accounts and password hashes) · `web-ext-artifacts/` · `test-results/` · `.env*` · secrets/tokens of any kind. They're in `.gitignore`. Don't force-add them.
 
 **Exception:** `dist/` **is** committed on purpose (offline demo for judges). If you change anything in `src/`, run `npm run build` and commit the updated `dist/`. CI fails if you forget.
 
@@ -114,7 +114,8 @@ Then **say the plan back** in a short list (files you'll touch, what changes, ho
 5. **Sync only works on ports 5173, 4173 and 3000** (allowlist in `sync.js`). `npm run dev` is pinned to 5173.
 6. **Accessibility is not optional:** keyboard access, visible focus, labels, screen-reader text, reduced motion, colour plus words (never colour alone).
 7. **Keep the extension's performance safeguards** (product-page fast path, hidden-tab deferral, debounced scans). See "Performance safeguards" in `docs/PROJECT.md`.
-8. **Privacy:** no network requests, analytics, URLs or card details stored. Validate everything read from storage or messages.
+8. **Privacy:** no analytics, URLs or card details stored. The accounts server (`server/`) holds **only** usernames, password hashes and session hashes. **Never send money data to it.** Validate everything read from storage, messages or requests.
+9. **The app must work without the server** (guest mode, offline demo). Never make a feature depend on `/api` without a guest fallback.
 
 ---
 
