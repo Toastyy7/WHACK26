@@ -1,9 +1,9 @@
 import React, { useRef, useState } from 'react';
-import { advanceGraceStatus } from '../grace.js';
+import { formatDate } from '../statements/dates.js';
 
 // Flow: draft → editing → review → submitting → submitted → reviewing → accepted/declined.
 // App supplies the account, an update function and a shared timer.
-export default function RequestGrace({ account, updateAccount, timer }) {
+export default function RequestGrace({ account, updateAccount, timer, onAdvance, payment, paymentError, onAddPaymentDetails }) {
   const { support, draft } = account;
   // Native dialog supplies modal focus handling and Escape-to-close behaviour.
   const disclaimer = useRef(null);
@@ -39,7 +39,15 @@ export default function RequestGrace({ account, updateAccount, timer }) {
             </strong>
             <p>Demo reference {support.id}</p>
             {support.status === 'accepted' && (
-              <p>In a real service, the lender would confirm the arrangement and its terms in writing.</p>
+              <>
+                {support.paymentDate ? <p>Payment due date moved to {formatDate(support.paymentDate)} (14-day demo extension).</p>
+                  : !payment ? <>
+                    <p>Add payment details to track a due date. No payment date has been changed.</p>
+                    <button className="secondary" onClick={onAddPaymentDetails}>Add payment details</button>
+                  </> : <p>No payment date was changed. You can edit your payment details on Home.</p>}
+                {paymentError && <p className="notice" role="alert">{paymentError}</p>}
+                <p>In a real service, the lender would confirm the arrangement and its terms in writing.</p>
+              </>
             )}
             {support.status === 'declined' && (
               <p>You can contact your lender to discuss other support options.</p>
@@ -49,7 +57,7 @@ export default function RequestGrace({ account, updateAccount, timer }) {
       </div>
       {/* Each click advances the demo once; terminal decisions cannot be rerolled. */}
       {['submitted', 'reviewing'].includes(support.status) && (
-        <button className="secondary" onClick={() => setStatus(advanceGraceStatus(support.status))}>
+        <button className="secondary" onClick={onAdvance}>
           Update request status
         </button>
       )}
@@ -57,9 +65,10 @@ export default function RequestGrace({ account, updateAccount, timer }) {
         <p>Demo decision chosen at random; it does not predict a lender’s decision.</p>
       )}
       {support.status === 'draft' && (
+        <><p>If accepted in this demo, Grace moves your saved payment date 14 days beyond today or the current due date, whichever is later. The amount due stays the same.</p>
         <button onClick={() => setStatus('editing')}>
           Request Grace
-        </button>
+        </button></>
       )}
       {support.status === 'editing' && (
         <form

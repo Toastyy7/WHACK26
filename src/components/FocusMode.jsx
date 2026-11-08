@@ -1,9 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { focusSummary } from '../focus.js';
 import { formatMoney } from '../utils/format.js';
+import { paymentTiming } from '../paymentDue.js';
+import { formatDate } from '../statements/dates.js';
 
 // Native modal keeps the background inactive and keyboard focus inside the popup.
-export default function FocusMode({ account, transactions, month, onReview, onTryPurchase }) {
+export default function FocusMode({ payment, today, account, transactions, month, onReview, onTryPurchase }) {
   const dialog = useRef(null);
   const content = useRef(null);
   const [step, setStep] = useState(-1);
@@ -54,6 +56,10 @@ export default function FocusMode({ account, transactions, month, onReview, onTr
     { title: 'Recorded spending this month', value: summary.count ? formatMoney(summary.spending) : 'No transactions recorded', text: `${monthLabel}. Only selected transactions dated this month are included. Your records may not show all your spending.` },
     { title: 'Largest recorded category', value: summary.topCategory?.category ?? 'No category to show yet', text: summary.topCategory ? `${formatMoney(summary.topCategory.amount)} recorded this month, including any transfers or cash assigned to this category. You can check the entries if that would help.` : 'You can add or review transactions whenever you are ready.' },
   ];
+  if (payment) facts.splice(1, 0, {
+    title: 'Payment due', value: formatMoney(payment.amount),
+    text: `${formatDate(payment.date)}. ${paymentTiming(payment.date, today)}. These are your manually entered payment details.`,
+  });
   const fact = facts[step];
   return <>
     <section className="focus-entry" aria-label="Focus mode">
@@ -61,7 +67,7 @@ export default function FocusMode({ account, transactions, month, onReview, onTr
       <button onClick={open}>Focus mode</button>
     </section>
     <dialog ref={dialog} className="focus-dialog" onKeyDown={trapTab} onCancel={stopBreathing} onClose={stopBreathing} aria-labelledby="focus-title">
-      <div className="focus-top"><span>Focus mode{step >= 0 ? ` · ${step + 1} of 5` : ''}</span><button className="secondary" onClick={close}>Close focus mode</button></div>
+      <div className="focus-top"><span>Focus mode{step >= 0 ? ` · ${step + 1} of ${facts.length + 1}` : ''}</span><button className="secondary" onClick={close}>Close focus mode</button></div>
       {/* Focus the new fact once, rather than announcing the whole dialog repeatedly. */}
       <div ref={content} tabIndex={-1} className="focus-content">
         <p className="muted">One thing at a time. You can stop here.</p>
@@ -91,7 +97,7 @@ export default function FocusMode({ account, transactions, month, onReview, onTr
       </div>
       {step >= 0 && <div className="focus-navigation">
         <button className="secondary" onClick={() => setStep(value => value - 1)}>Back</button>
-        {step < 4 && <button onClick={() => setStep(value => value + 1)}>Next</button>}
+        {step < facts.length && <button onClick={() => setStep(value => value + 1)}>Next</button>}
       </div>}
     </dialog>
   </>;

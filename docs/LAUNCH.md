@@ -191,3 +191,36 @@ plays an expanding/shrinking circle with four-second in/out prompts; Pause stops
 “Show my summary” skips the guide immediately. Closing, Escape, leaving the welcome
 step or Reset demo stops its timer. Both system and app reduced-motion settings keep
 the circle still while the words change. No breathing history is recorded.
+
+### Track a payment due
+On Home choose **Add payment details**, enter the amount and date from your lender's
+statement, then **Save payment details**. The card shows the saved amount/date plus
+**Due in N days**, **Due today**, or **Past due date**. Past dates are allowed for
+tracking. **Edit payment details** changes the record; **Clear payment details**
+removes it. This does not make a payment or change the balance. Details stay after
+refresh, are separate per account/guest and are cleared by **Reset demo**. Focus
+mode includes them after **What you owe**. Day counts refresh within a minute or
+when the window regains focus. Automated browser check after building:
+`python3 scripts/check-payment-due.py` (same Playwright setup as other browser checks).
+
+### Grace and the payment date
+Add payment details on Home, then use Menu → Request Grace and follow the existing
+review/confirmation flow. The random demo decision still may be accepted or
+declined. On acceptance, the due date moves 14 days beyond the later of today or
+the existing due date; the amount due stays unchanged. The acceptance message,
+Home and Focus mode show the new date, which stays after refresh. Declines do not
+change it. With no saved payment details, acceptance offers **Add payment details**
+and opens the Home editor without inventing an amount or date. The same request
+cannot extend twice. **Reset demo** clears the request and payment details.
+Automated deterministic acceptance/decline checks (after `npm run build`):
+`python3 scripts/check-grace-payment.py`, using the usual Playwright setup.
+
+### If the statement reader fails to load
+Uploads retry one failed reader-module load automatically without refreshing or
+discarding the chosen file. If both attempts fail, stop the development server,
+run `npm run dev` again, hard-refresh the dashboard with **Ctrl+Shift+R**, and choose
+the statement again. Existing saved transactions are kept. Reset or Cancel reading
+prevents a pending module load from starting a read. Parser errors still show their specific messages.
+To check recovery against Vite itself, run `python3 scripts/check-statement-dev.py`
+with the usual Playwright setup. It starts a temporary development server with an
+isolated dependency cache and simulates failed reader requests using synthetic data.
